@@ -17,3 +17,8 @@ imgui.ini
 .idea/
 Thumbs.db
 desktop.ini
+
+# Local development notes, not part of the deliverable. These are written
+# during verification runs; only the committed report history matters.
+update*.md
+CSOPESY-MO3/

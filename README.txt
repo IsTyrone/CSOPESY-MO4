@@ -26,7 +26,11 @@ Building
 --------
 Prerequisites:  see prerequisite.md
 
-  1.  Open a terminal (Command Prompt or PowerShell) in this folder.
+  1.  Clone the repository and open a terminal (Command Prompt or PowerShell)
+      in the cloned folder:
+
+          git clone https://github.com/IsTyrone/CSOPESY-MO4.git
+          cd CSOPESY-MO4
   2.  Run:
           build.bat
   3.  On success the output is csopesy.exe in the same folder.
