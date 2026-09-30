@@ -1,0 +1,19 @@
+# Build outputs
+*.exe
+*.o
+*.obj
+
+# NOTE: do NOT ignore *.a -- third_party/glfw/lib/libglfw3.a is a vendored
+# binary that build.bat links against (-lglfw3). GLFW ships here as source with
+# no CMakeLists.txt, so nothing regenerates it. Excluding it breaks a fresh
+# clone: the build fails with an unresolved -lglfw3.
+
+# ImGui writes this at runtime; the app sets io.IniFilename = nullptr so it is
+# never read, but a stale copy may still be produced by other tooling.
+imgui.ini
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

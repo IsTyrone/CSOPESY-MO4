@@ -1,0 +1,28 @@
+# CSOPESY Semi-Major Output 2 — runtime parameters
+#
+# Every value below is read at startup.  The mock-up can be re-configured
+# without recompiling: edit this file and run csopesy.exe again.
+# Lines starting with '#' and blank lines are ignored.
+
+# Host window size (minimum 800 x 600)
+framebuffer-width  1280
+framebuffer-height 800
+
+# Process model feeding the Task Manager table
+process-count      6
+min-cpu            0.5
+max-cpu            42
+min-mem-kb         2048
+max-mem-kb         65536
+total-mem-kb       262144
+update-interval-ms 180
+
+# Seed for the process generator.  The same seed always replays the
+# same sequence of readings, which keeps black-box test runs reproducible.
+rng-seed           20260918
+
+# Shell layout
+taskbar-position   top
+
+# Wallpaper: gradient | pattern | plain
+wallpaper-mode     gradient
