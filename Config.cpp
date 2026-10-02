@@ -51,6 +51,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "rng-seed")            rngSeed            = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 10));
         else if (key == "taskbar-position")    taskbarAtTop       = (value == "top");
         else if (key == "wallpaper-mode")      wallpaperMode      = value;
+        else if (key == "wallpaper-image")     wallpaperImage     = value;
         else if (key == "ui-scale")            uiScale            = static_cast<float>(std::atof(value.c_str()));
         else if (key == "show-desktop-icons")  showDesktopIcons   = (value == "true" || value == "1" || value == "yes");
         else if (key == "theme")               theme              = value;
@@ -85,6 +86,7 @@ std::vector<std::string> Config::dump() const {
     out.push_back("  rng-seed:            " + std::to_string(rngSeed));
     out.push_back("  taskbar-position:    " + std::string(taskbarAtTop ? "top" : "bottom"));
     out.push_back("  wallpaper-mode:      " + wallpaperMode);
+    out.push_back("  wallpaper-image:     " + wallpaperImage);
     out.push_back("  ui-scale:            " + std::to_string(uiScale));
     out.push_back("  theme:               " + theme);
     out.push_back("  config.txt loaded:   " + std::string(loaded ? "yes" : "no (using defaults)"));

@@ -84,6 +84,11 @@ bool Compositor::init() {
         return false;
     }
 
+    // ── Load wallpaper image texture if configured ──
+    if (m_config.wallpaperMode == "image") {
+        m_wallpaperTexture.loadFromFile(m_config.wallpaperImage);
+    }
+
     // ── Register Application Modules via Polymorphic WindowManager ──
     m_windowManager.registerApp(std::make_shared<FilesApp>());
     m_windowManager.registerApp(std::make_shared<SettingsApp>());
@@ -216,6 +221,7 @@ void Compositor::endFrame() {
 }
 
 void Compositor::shutdown() {
+    m_wallpaperTexture.release();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

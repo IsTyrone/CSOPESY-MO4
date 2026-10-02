@@ -219,14 +219,16 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                 static int wpIndex = (cfg.wallpaperMode == "classic-teal") ? 0 :
                                      (cfg.wallpaperMode == "gradient")     ? 1 :
                                      (cfg.wallpaperMode == "bliss")        ? 2 :
-                                     (cfg.wallpaperMode == "pattern")      ? 3 : 4;
+                                     (cfg.wallpaperMode == "pattern")      ? 3 :
+                                     (cfg.wallpaperMode == "image")        ? 5 : 4;
 
                 const char* wpModes[] = {
                     "Classic Teal (Windows 95/98 default)",
                     "Retro Setup Gradient (Windows 2000)",
                     "Bliss Hills (Windows XP style)",
                     "Subtle Grid Pattern",
-                    "Plain Solid Slate"
+                    "Plain Solid Slate",
+                    "Image (assets/wallpapers/...)"
                 };
 
                 if (ImGui::Combo("Wallpaper Style", &wpIndex, wpModes, IM_ARRAYSIZE(wpModes))) {
@@ -236,6 +238,7 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                         case 2: cfg.wallpaperMode = "bliss"; break;
                         case 3: cfg.wallpaperMode = "pattern"; break;
                         case 4: cfg.wallpaperMode = "plain"; break;
+                        case 5: cfg.wallpaperMode = "image"; break;
                     }
                 }
 
@@ -245,12 +248,16 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                 const ImVec2 prevPos = ImGui::GetCursorScreenPos();
                 const ImVec2 prevSize(ImGui::GetContentRegionAvail().x, 80.0f);
                 ImDrawList* dl = ImGui::GetWindowDrawList();
-                RetroGfx::drawSunkenBorder(dl, prevPos, ImVec2(prevPos.x + prevSize.x, prevPos.y + prevSize.y),
-                                          (wpIndex == 0) ? RetroGfx::kTealDesktop :
-                                          (wpIndex == 1) ? IM_COL32(16, 32, 72, 255) :
-                                          (wpIndex == 2) ? IM_COL32(50, 140, 220, 255) :
-                                          (wpIndex == 3) ? IM_COL32(28, 42, 60, 255) :
-                                                           IM_COL32(30, 30, 30, 255));
+                const ImU32 previewCol =
+                    (wpIndex == 0) ? RetroGfx::kTealDesktop :
+                    (wpIndex == 1) ? IM_COL32(16, 32, 72, 255) :
+                    (wpIndex == 2) ? IM_COL32(50, 140, 220, 255) :
+                    (wpIndex == 3) ? IM_COL32(28, 42, 60, 255) :
+                    (wpIndex == 5) ? IM_COL32(80, 140, 80, 255) :
+                                     IM_COL32(30, 30, 30, 255);
+                RetroGfx::drawSunkenBorder(dl, prevPos,
+                                           ImVec2(prevPos.x + prevSize.x, prevPos.y + prevSize.y),
+                                           previewCol);
                 ImGui::Dummy(prevSize);
 
                 ImGui::Spacing();

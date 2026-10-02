@@ -11,7 +11,8 @@
 
 namespace {
 
-void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) {
+void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode,
+                   ImTextureID imageTex, int imgW, int imgH) {
     if (mode == "classic-teal" || mode.empty()) {
         // Authentic Windows 95/98 Teal: #008080
         dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, RetroGfx::kTealDesktop);
@@ -34,6 +35,29 @@ void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) 
         for (float y = 0.0f; y < view.y; y += 4.0f) {
             dl->AddLine(ImVec2(0.0f, y), ImVec2(view.x, y), IM_COL32(0, 0, 0, 18), 1.0f);
         }
+        } else if (mode == "image" && imageTex != 0 && imgW > 0 && imgH > 0) {
+        // "Cover" fit: scale image to fill the whole view, cropping overflow.
+        const float viewAspect = view.x / view.y;
+        const float imgAspect  = static_cast<float>(imgW) / static_cast<float>(imgH);
+
+        float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
+        if (imgAspect > viewAspect) {
+            // Image is wider than view -> crop left/right
+            const float visibleFrac = viewAspect / imgAspect;
+            const float trim = (1.0f - visibleFrac) * 0.5f;
+            u0 = trim; u1 = 1.0f - trim;
+        } else {
+            // Image is taller than view -> crop top/bottom
+            const float visibleFrac = imgAspect / viewAspect;
+            const float trim = (1.0f - visibleFrac) * 0.5f;
+            v0 = trim; v1 = 1.0f - trim;
+        }
+
+        dl->AddImage(imageTex, ImVec2(0.0f, 0.0f), view,
+                     ImVec2(u0, v0), ImVec2(u1, v1));
+    } else if (mode == "image") {
+        // Image mode requested but texture failed to load — safe fallback
+        dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(16, 32, 48, 255));
     } else {
         // Plain dark charcoal
         dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(24, 28, 36, 255));
@@ -123,7 +147,9 @@ void Desktop::draw(Compositor& compositor, const ImVec2& areaMin, const ImVec2& 
 
     // ── 1. Wallpaper Layer (Lowest layer) ──
     ImDrawList* bg = ImGui::GetBackgroundDrawList();
-    drawWallpaper(bg, view, compositor.config().wallpaperMode);
+    const WallpaperTexture& wpTex = compositor.wallpaperTexture();
+    drawWallpaper(bg, view, compositor.config().wallpaperMode,
+                  wpTex.handle(), wpTex.width(), wpTex.height());
 
     // ── 2. Desktop Digital Clock (Drawn to background draw list — zero input blocking) ──
     drawDesktopClock(bg, areaMin, areaMax);

@@ -23,8 +23,12 @@ rng-seed           20260918
 # Shell layout: bottom (Classic Windows standard) | top
 taskbar-position   bottom
 
-# Wallpaper style: classic-teal | gradient | bliss | pattern | plain
-wallpaper-mode     classic-teal
+# Wallpaper style: classic-teal | gradient | bliss | pattern | plain | image
+wallpaper-mode     image
+
+# Path to the wallpaper image (relative to working directory)
+# Used only when wallpaper-mode is "image"
+wallpaper-image    assets/wallpapers/bliss-classic.jpg
 
 # UI and Icon scaling factor (e.g., 1.25, 1.5 - enlarges icons for high-res screens)
 ui-scale           1.25

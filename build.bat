@@ -54,7 +54,7 @@ REM ── Paths ─────────────────────
 set IMGUI=third_party\imgui
 set GLFW=third_party\glfw
 
-set INCLUDES=-I. -I%IMGUI% -I%IMGUI%\backends -I%GLFW%\include
+set INCLUDES=-I. -I%IMGUI% -I%IMGUI%\backends -I%GLFW%\include -Ithird_party\stb
 set LIBDIRS=-L%GLFW%\lib
 set LIBS=-lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32
 
@@ -80,7 +80,7 @@ if not exist "%IMGUI%\imgui.cpp" (
 )
 
 REM ── Source files ───────────────────────────────────────────────
-set APP_SRC=main.cpp Compositor.cpp Desktop.cpp TaskBar.cpp TaskManager.cpp AppScreen.cpp ProcessSimulator.cpp Config.cpp RetroGfx.cpp WindowManager.cpp
+set APP_SRC=main.cpp Compositor.cpp Desktop.cpp TaskBar.cpp TaskManager.cpp AppScreen.cpp ProcessSimulator.cpp Config.cpp RetroGfx.cpp WindowManager.cpp WallpaperTexture.cpp
 
 set IMGUI_SRC=%IMGUI%\imgui.cpp %IMGUI%\imgui_draw.cpp %IMGUI%\imgui_tables.cpp %IMGUI%\imgui_widgets.cpp %IMGUI%\backends\imgui_impl_glfw.cpp %IMGUI%\backends\imgui_impl_opengl3.cpp
 

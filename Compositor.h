@@ -11,6 +11,7 @@
 #include "Config.h"
 #include "ProcessSimulator.h"
 #include "WindowManager.h"
+#include "WallpaperTexture.h"
 
 struct GLFWwindow;
 
@@ -42,6 +43,9 @@ public:
     const Config&           config() const    { return m_config; }
     const ProcessSimulator& simulator() const { return m_simulator; }
 
+    WallpaperTexture& wallpaperTexture() { return m_wallpaperTexture; }
+    const WallpaperTexture& wallpaperTexture() const { return m_wallpaperTexture; }
+
     static const char* appFiles()       { return "files"; }
     static const char* appSettings()    { return "settings"; }
     static const char* appTaskManager() { return "taskmanager"; }
@@ -54,6 +58,8 @@ private:
     void drawAppWindows();
     void drawTaskBarLayer();
     void drawPwrLayer();
+
+    WallpaperTexture m_wallpaperTexture;
 
     GLFWwindow*      m_window = nullptr;
     Config           m_config;

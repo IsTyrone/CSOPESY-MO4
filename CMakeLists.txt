@@ -26,7 +26,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
-    ${GLFW_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
 )
 
 # Application Sources
@@ -41,6 +41,7 @@ set(APP_SOURCES
     Config.cpp
     RetroGfx.cpp
     WindowManager.cpp
+    WallpaperTexture.cpp
 )
 
 # Dear ImGui Vendored Sources
