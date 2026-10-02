@@ -42,6 +42,7 @@ set(APP_SOURCES
     RetroGfx.cpp
     WindowManager.cpp
     WallpaperTexture.cpp
+    BootScreen.cpp
 )
 
 # Dear ImGui Vendored Sources

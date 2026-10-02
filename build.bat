@@ -80,7 +80,7 @@ if not exist "%IMGUI%\imgui.cpp" (
 )
 
 REM ── Source files ───────────────────────────────────────────────
-set APP_SRC=main.cpp Compositor.cpp Desktop.cpp TaskBar.cpp TaskManager.cpp AppScreen.cpp ProcessSimulator.cpp Config.cpp RetroGfx.cpp WindowManager.cpp WallpaperTexture.cpp
+set APP_SRC=main.cpp Compositor.cpp Desktop.cpp TaskBar.cpp TaskManager.cpp AppScreen.cpp ProcessSimulator.cpp Config.cpp RetroGfx.cpp WindowManager.cpp WallpaperTexture.cpp BootScreen.cpp
 
 set IMGUI_SRC=%IMGUI%\imgui.cpp %IMGUI%\imgui_draw.cpp %IMGUI%\imgui_tables.cpp %IMGUI%\imgui_widgets.cpp %IMGUI%\backends\imgui_impl_glfw.cpp %IMGUI%\backends\imgui_impl_opengl3.cpp
 

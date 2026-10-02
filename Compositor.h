@@ -12,6 +12,7 @@
 #include "ProcessSimulator.h"
 #include "WindowManager.h"
 #include "WallpaperTexture.h"
+#include "BootScreen.h"
 
 struct GLFWwindow;
 
@@ -46,6 +47,9 @@ public:
     WallpaperTexture& wallpaperTexture() { return m_wallpaperTexture; }
     const WallpaperTexture& wallpaperTexture() const { return m_wallpaperTexture; }
 
+    WallpaperTexture& bootLogo() { return m_bootLogo; }
+    const WallpaperTexture& bootLogo() const { return m_bootLogo; }
+
     static const char* appFiles()       { return "files"; }
     static const char* appSettings()    { return "settings"; }
     static const char* appTaskManager() { return "taskmanager"; }
@@ -54,12 +58,14 @@ private:
     void applyStyle();
     void beginFrame();
     void endFrame();
+    void drawBootLayer(double now);
     void drawDesktopLayer();
     void drawAppWindows();
     void drawTaskBarLayer();
     void drawPwrLayer();
 
     WallpaperTexture m_wallpaperTexture;
+    WallpaperTexture m_bootLogo; // center logo of the XP boot splash
 
     GLFWwindow*      m_window = nullptr;
     Config           m_config;
@@ -68,5 +74,7 @@ private:
 
     bool   m_shutdownRequested = false;
     double m_lastTime = 0.0;
+    double m_bootStart = -1.0;   // glfwGetTime() at run() entry; -1 = boot not started
+    bool   m_bootDone = false;   // true once the XP splash has finished / been skipped
     ImVec2 m_viewport = ImVec2(0.0f, 0.0f);
 };
