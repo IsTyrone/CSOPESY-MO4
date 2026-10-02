@@ -1,24 +1,35 @@
 /*
- *  CSOPESY Semi-Major Output 2  —  Desktop-Style OS Mock-up
- *  Requirement C — Task Manager
- *
- *    • A window that closely resembles the Windows task manager.
- *    • Must have a placeholder table showing "Processes" and their respective
- *      CPU and memory usage.
- *    • Uses values from the live ProcessSimulator (placeholder-grade, driven
- *      by a seeded generator so runs are reproducible).
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Requirement C — Task Manager (Windows Classic Style)
  */
 
 #pragma once
-#include "imgui.h"
+#include "IAppWindow.h"
+#include <vector>
 
 class Compositor;
 
-namespace TaskManager {
+class TaskManagerApp : public IAppWindow {
+public:
+    TaskManagerApp();
+    virtual ~TaskManagerApp() = default;
 
-constexpr float kHeaderH = 74.0f;
+    const std::string& id() const override { return m_id; }
+    const std::string& title() const override { return m_title; }
 
-// keepOpen is set to false when the user closes the window.
-void draw(Compositor& compositor, bool* keepOpen);
+    void render(Compositor& compositor, bool* keepOpen) override;
+    void drawIcon(ImDrawList* dl, const ImVec2& center, float size) override;
 
-} // namespace TaskManager
+private:
+    void renderProcessesTab(Compositor& compositor);
+    void renderPerformanceTab(Compositor& compositor);
+    void renderApplicationsTab(Compositor& compositor);
+
+    std::string m_id = "taskmanager";
+    std::string m_title = "Task Manager";
+    int m_currentTab = 1; // 0 = Applications, 1 = Processes, 2 = Performance
+
+    // Rolling history for performance tab graph
+    std::vector<float> m_cpuHistory;
+    float m_historyTimer = 0.0f;
+};

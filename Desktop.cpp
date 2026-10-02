@@ -1,50 +1,119 @@
+/*
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Desktop — Implementation with Windows Classic styling, Desktop Icons, Clock, and PWR button
+ */
+
 #include "Desktop.h"
 #include "Compositor.h"
-
-#include <cmath>
+#include "RetroGfx.h"
 #include <ctime>
+#include <algorithm>
 
 namespace {
 
-// ── Wallpaper palette ───────────────────────────────────────────
-const ImU32 kWallTop     = IM_COL32(24, 34, 58, 255);
-const ImU32 kWallBottom  = IM_COL32(12, 16, 28, 255);
-const ImU32 kWallAccentA = IM_COL32(58, 110, 190, 70);
-const ImU32 kWallAccentB = IM_COL32(120, 78, 190, 55);
-const ImU32 kClockColor  = IM_COL32(232, 240, 255, 255);
-const ImU32 kTextShadow  = IM_COL32(0, 0, 0, 170);
-const ImU32 kPwrIdle     = IM_COL32(46, 54, 70, 235);
-const ImU32 kPwrHover    = IM_COL32(178, 56, 56, 245);
-
-void drawGradient(ImDrawList* dl, const ImVec2& size) {
-    dl->AddRectFilledMultiColor(ImVec2(0.0f, 0.0f), size, kWallTop, kWallTop, kWallBottom, kWallBottom);
-}
-
-void drawPattern(ImDrawList* dl, const ImVec2& size) {
-    // Diagonal hairlines — a "pattern drawn using ImGui draw commands".
-    const float step = 46.0f;
-    for (float x = -size.y; x < size.x; x += step)
-        dl->AddLine(ImVec2(x, 0.0f), ImVec2(x + size.y, size.y), IM_COL32(255, 255, 255, 9), 1.0f);
-
-    // Two soft blooms for depth.
-    dl->AddCircleFilled(ImVec2(size.x * 0.18f, size.y * 0.26f), size.x * 0.20f, kWallAccentA);
-    dl->AddCircleFilled(ImVec2(size.x * 0.82f, size.y * 0.72f), size.x * 0.24f, kWallAccentB);
-}
-
-// Power glyph: an open ring plus the vertical stroke through the gap.
-void drawPowerGlyph(ImDrawList* dl, const ImVec2& centre, float radius, ImU32 col) {
-    const int   segments = 32;
-    const float gapHalf  = 0.42f;                        // radians of missing arc
-    const float start    = -1.5707963f + gapHalf;        // just right of top-centre
-    for (int i = 0; i < segments; ++i) {
-        const float a0 = start + (2.0f * 3.14159265f - 2.0f * gapHalf) * (static_cast<float>(i) / segments);
-        const float a1 = start + (2.0f * 3.14159265f - 2.0f * gapHalf) * (static_cast<float>(i + 1) / segments);
-        dl->AddLine(ImVec2(centre.x + std::cos(a0) * radius, centre.y + std::sin(a0) * radius),
-                    ImVec2(centre.x + std::cos(a1) * radius, centre.y + std::sin(a1) * radius),
-                    col, 1.8f);
+void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) {
+    if (mode == "classic-teal" || mode.empty()) {
+        // Authentic Windows 95/98 Teal: #008080
+        dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, RetroGfx::kTealDesktop);
+    } else if (mode == "gradient") {
+        // Windows 2000 / Setup gradient (Deep Navy to Slate Blue)
+        const ImU32 topCol = IM_COL32(0, 0, 128, 255);
+        const ImU32 botCol = IM_COL32(16, 72, 138, 255);
+        dl->AddRectFilledMultiColor(ImVec2(0.0f, 0.0f), view, topCol, topCol, botCol, botCol);
+    } else if (mode == "bliss") {
+        // Windows XP Bliss-inspired Sky and Hill
+        const float skyH = view.y * 0.62f;
+        dl->AddRectFilledMultiColor(ImVec2(0.0f, 0.0f), ImVec2(view.x, skyH),
+                                    IM_COL32(32, 120, 218, 255), IM_COL32(32, 120, 218, 255),
+                                    IM_COL32(160, 212, 255, 255), IM_COL32(160, 212, 255, 255));
+        dl->AddRectFilledMultiColor(ImVec2(0.0f, skyH), view,
+                                    IM_COL32(64, 168, 52, 255), IM_COL32(64, 168, 52, 255),
+                                    IM_COL32(34, 112, 26, 255), IM_COL32(34, 112, 26, 255));
+    } else if (mode == "pattern") {
+        dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, RetroGfx::kTealDesktop);
+        for (float y = 0.0f; y < view.y; y += 4.0f) {
+            dl->AddLine(ImVec2(0.0f, y), ImVec2(view.x, y), IM_COL32(0, 0, 0, 18), 1.0f);
+        }
+    } else {
+        // Plain dark charcoal
+        dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(24, 28, 36, 255));
     }
-    dl->AddLine(ImVec2(centre.x, centre.y - radius - 3.5f),
-                ImVec2(centre.x, centre.y - 1.0f), col, 1.8f);
+}
+
+// Draw desktop clock directly on background draw list so it never steals mouse input
+void drawDesktopClock(ImDrawList* dl, const ImVec2& areaMin, const ImVec2& areaMax) {
+    const std::time_t now = std::time(nullptr);
+    std::tm local {};
+    localtime_s(&local, &now);
+
+    char clockStr[32];
+    std::strftime(clockStr, sizeof(clockStr), "%I:%M:%S %p", &local);
+    const char* clockText = (clockStr[0] == '0') ? clockStr + 1 : clockStr;
+
+    char dateStr[48];
+    std::strftime(dateStr, sizeof(dateStr), "%A, %B %d, %Y", &local);
+
+    const float clockX = areaMax.x - 270.0f;
+    const float clockY = areaMin.y + 20.0f;
+    const ImVec2 clockMin(clockX, clockY);
+    const ImVec2 clockMax(areaMax.x - 20.0f, clockY + 68.0f);
+
+    // Beveled frame for desktop clock widget
+    RetroGfx::draw3DBox(dl, clockMin, clockMax, false, RetroGfx::kGrayFace);
+
+    // Sunken inner display screen (LCD/LED feel)
+    const ImVec2 lcdMin(clockMin.x + 4.0f, clockMin.y + 4.0f);
+    const ImVec2 lcdMax(clockMax.x - 4.0f, clockMax.y - 4.0f);
+    RetroGfx::drawSunkenBorder(dl, lcdMin, lcdMax, IM_COL32(10, 24, 18, 255));
+
+    // Green LCD Clock Text
+    const ImVec2 cSize = ImGui::CalcTextSize(clockText);
+    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - cSize.x) * 0.5f, lcdMin.y + 8.0f),
+                IM_COL32(0, 255, 120, 255), clockText);
+
+    const ImVec2 dSize = ImGui::CalcTextSize(dateStr);
+    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - dSize.x) * 0.5f, lcdMin.y + 32.0f),
+                IM_COL32(140, 210, 180, 255), dateStr);
+}
+
+// Single desktop shortcut icon button
+void drawDesktopShortcut(const char* label, const char* appId, Compositor& compositor,
+                         float boxW, float iconGraphicSize,
+                         void (*iconDrawer)(ImDrawList*, const ImVec2&, float)) {
+    const ImVec2 cur = ImGui::GetCursorScreenPos();
+    const ImVec2 boxSize(boxW, boxW + 20.0f);
+    const ImVec2 pMax(cur.x + boxSize.x, cur.y + boxSize.y);
+
+    ImGui::InvisibleButton(label, boxSize);
+
+    const bool hovered = ImGui::IsItemHovered();
+    const bool clicked = ImGui::IsItemClicked(0);
+    const bool open    = appId ? compositor.windowManager().isAppOpen(appId) : false;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    if (hovered || open) {
+        // Windows 95/98 dotted or highlighted selection rectangle
+        dl->AddRectFilled(cur, pMax, IM_COL32(0, 0, 128, open ? 140 : 80), 2.0f);
+        dl->AddRect(cur, pMax, IM_COL32(255, 255, 255, 160), 2.0f, 0, 1.0f);
+    }
+
+    // Icon graphic in top half
+    const ImVec2 iconCenter(cur.x + boxW * 0.5f, cur.y + boxW * 0.5f - 2.0f);
+    iconDrawer(dl, iconCenter, iconGraphicSize);
+
+    // Label text centered underneath icon
+    const ImVec2 textSize = ImGui::CalcTextSize(label);
+    const ImVec2 textPos(cur.x + (boxW - textSize.x) * 0.5f, cur.y + boxW + 2.0f);
+
+    dl->AddText(ImVec2(textPos.x + 1.0f, textPos.y + 1.0f), IM_COL32(0, 0, 0, 220), label);
+    dl->AddText(textPos, RetroGfx::kWhite, label);
+
+    if (clicked && appId) {
+        compositor.windowManager().toggleApp(appId);
+    }
+
+    ImGui::Spacing();
 }
 
 } // namespace
@@ -52,98 +121,92 @@ void drawPowerGlyph(ImDrawList* dl, const ImVec2& centre, float radius, ImU32 co
 void Desktop::draw(Compositor& compositor, const ImVec2& areaMin, const ImVec2& areaMax) {
     const ImVec2 view = compositor.viewportSize();
 
-    // ── Wallpaper: the very first thing submitted each frame ──
+    // ── 1. Wallpaper Layer (Lowest layer) ──
     ImDrawList* bg = ImGui::GetBackgroundDrawList();
-    const std::string& mode = compositor.config().wallpaperMode;
-    if (mode == "plain") {
-        bg->AddRectFilled(ImVec2(0.0f, 0.0f), view, kWallBottom);
-    } else {
-        drawGradient(bg, view);
-        if (mode == "gradient" || mode == "pattern") drawPattern(bg, view);
+    drawWallpaper(bg, view, compositor.config().wallpaperMode);
+
+    // ── 2. Desktop Digital Clock (Drawn to background draw list — zero input blocking) ──
+    drawDesktopClock(bg, areaMin, areaMax);
+
+    // ── 3. Desktop Shortcut Icons (Constrained to left sidebar — never covers full screen) ──
+    if (compositor.config().showDesktopIcons) {
+        const float uiScale = compositor.config().uiScale;
+        const float boxW = 86.0f * uiScale;
+        const float iconGraphicSize = 44.0f * uiScale;
+        const float shortcutsW = boxW + 20.0f;
+        const float shortcutsH = (boxW + 36.0f) * 3.5f;
+
+        const ImGuiWindowFlags scFlags =
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
+
+        ImGui::SetNextWindowPos(ImVec2(areaMin.x + 16.0f, areaMin.y + 16.0f));
+        ImGui::SetNextWindowSize(ImVec2(shortcutsW, shortcutsH));
+        ImGui::SetNextWindowBgAlpha(0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f));
+        ImGui::Begin("##DesktopShortcuts", nullptr, scFlags);
+        ImGui::PopStyleVar();
+
+        drawDesktopShortcut("Files", "files", compositor, boxW, iconGraphicSize, RetroGfx::drawFolderIcon);
+        drawDesktopShortcut("Settings", "settings", compositor, boxW, iconGraphicSize, RetroGfx::drawSettingsIcon);
+        drawDesktopShortcut("Task Manager", "taskmanager", compositor, boxW, iconGraphicSize, RetroGfx::drawTaskManagerIcon);
+
+        ImGui::End();
     }
-
-    // ── This layer's own full-screen window carries the clock and PWR ──
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus |
-        ImGuiWindowFlags_NoInputs;   // prevent this full-screen layer from stealing hover
-
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(view);
-    ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::Begin("##DesktopLayer", nullptr, flags);
-
-    ImDrawList* fg = ImGui::GetWindowDrawList();
-    const float fontH = ImGui::GetFontSize();
-
-    // ── Real-time clock: rebuilt from the system clock every frame ──
-    const std::time_t now = std::time(nullptr);
-    std::tm local {};
-    localtime_s(&local, &now);
-
-    char clock[32];
-    std::strftime(clock, sizeof(clock), "%I:%M:%S  %p", &local);
-    const char* clockText = (clock[0] == '0') ? clock + 1 : clock;   // drop leading zero
-
-    const ImVec2 clockPos(areaMin.x + kClockX, areaMin.y + kClockY);
-    fg->AddText(ImVec2(clockPos.x + 1.0f, clockPos.y + 1.0f), kTextShadow, clockText);
-    fg->AddText(clockPos, kClockColor, clockText);
-
-    char date[48];
-    std::strftime(date, sizeof(date), "%A, %d %B %Y", &local);
-    const ImVec2 datePos(clockPos.x, clockPos.y + fontH * 1.2f);
-    fg->AddText(ImVec2(datePos.x + 1.0f, datePos.y + 1.0f), kTextShadow, date);
-    fg->AddText(datePos, IM_COL32(178, 194, 224, 255), date);
-
-    ImGui::End();   // end ##DesktopLayer (NoInputs — clock only, no hit-testing)
 }
 
-void Desktop::drawPwr(Compositor& compositor, const ImVec2& areaMin, const ImVec2& areaMax) {
-    // ── PWR button in its own small window so it can receive input ──
-    // Drawn LAST each frame so it sits on top of the z-order.
-    const ImVec2 pwrOrigin(areaMax.x - kPwrMargin - kPwrW, areaMax.y - kPwrMargin - kPwrH);
-    const ImVec2 pwrSize(kPwrW, kPwrH);
+void Desktop::drawPwr(Compositor& compositor, const ImVec2& /*areaMin*/, const ImVec2& areaMax) {
+    const float uiScale = compositor.config().uiScale;
+    const float pwrW = 142.0f * uiScale;
+    const float pwrH = 44.0f * uiScale;
+    const float margin = 20.0f;
+
+    // Position PWR button at bottom-right of desktop area (just above taskbar)
+    const ImVec2 pwrOrigin(areaMax.x - margin - pwrW, areaMax.y - margin - pwrH);
 
     const ImGuiWindowFlags pwrFlags =
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoSavedSettings;
 
     ImGui::SetNextWindowPos(pwrOrigin);
-    ImGui::SetNextWindowSize(pwrSize);
+    ImGui::SetNextWindowSize(ImVec2(pwrW, pwrH));
     ImGui::SetNextWindowBgAlpha(0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("##PwrLayer", nullptr, pwrFlags);
     ImGui::PopStyleVar();
 
     const ImVec2 pwrMin = ImGui::GetWindowPos();
-    const ImVec2 pwrMax(pwrMin.x + kPwrW, pwrMin.y + kPwrH);
+    const ImVec2 pwrMax(pwrMin.x + pwrW, pwrMin.y + pwrH);
 
-    ImGui::SetCursorScreenPos(pwrMin);
-    ImGui::InvisibleButton("##PwrButton", pwrSize);
+    ImGui::SetCursorPos(ImVec2(0.0f, 0.0f));
+    const bool clickedBtn = ImGui::InvisibleButton("##PwrButton", ImVec2(pwrW, pwrH));
     const bool hovered = ImGui::IsItemHovered();
-    const bool clicked  = ImGui::IsItemClicked();
+    const bool pressed = ImGui::IsItemActive();
+    const bool clicked = clickedBtn || (hovered && ImGui::IsMouseClicked(0));
 
-    ImDrawList* pwrDl = ImGui::GetWindowDrawList();
-    pwrDl->AddRectFilled(pwrMin, pwrMax, hovered ? kPwrHover : kPwrIdle, 6.0f);
-    pwrDl->AddRect(pwrMin, pwrMax, hovered ? IM_COL32(255, 190, 190, 255) : IM_COL32(226, 96, 96, 220),
-                6.0f, 0, hovered ? 1.4f : 1.0f);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    const ImVec2 glyphCentre(pwrMin.x + 32.0f, (pwrMin.y + pwrMax.y) * 0.5f);
-    drawPowerGlyph(pwrDl, glyphCentre, 8.0f, IM_COL32(240, 216, 216, 255));
+    // Classic 3D Beveled Button
+    RetroGfx::draw3DBox(dl, pwrMin, pwrMax, pressed, RetroGfx::kGrayFace);
 
-    const ImVec2 labelSize = ImGui::CalcTextSize("PWR");
-    pwrDl->AddText(ImVec2(pwrMin.x + 54.0f, glyphCentre.y - labelSize.y * 0.5f),
-                IM_COL32(244, 226, 226, 255), "PWR");
+    // Power Icon and Text
+    const float iconSize = 22.0f * uiScale;
+    const ImVec2 iconCenter(pwrMin.x + 24.0f * uiScale, (pwrMin.y + pwrMax.y) * 0.5f);
+    RetroGfx::drawPowerIcon(dl, iconCenter, iconSize);
 
-    if (hovered) ImGui::SetTooltip("Shut down CSOPESY  (Requirement A)");
+    const ImVec2 labelSize = ImGui::CalcTextSize("Shut Down");
+    const ImVec2 textPos(iconCenter.x + iconSize * 0.8f, (pwrMin.y + pwrMax.y - labelSize.y) * 0.5f);
+    dl->AddText(textPos, RetroGfx::kBlack, "Shut Down");
 
-    // Requirement A: this is the one and only shutdown path.
-    if (clicked) compositor.requestShutdown();
+    if (hovered) {
+        ImGui::SetTooltip("Shut down the CSOPESY OS Mockup (Requirement A: Clean exit path)");
+    }
 
-    ImGui::End();   // end ##PwrLayer
+    if (clicked) {
+        compositor.requestShutdown();
+    }
+
+    ImGui::End();
 }
-

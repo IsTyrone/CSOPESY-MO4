@@ -1,13 +1,17 @@
+/*
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Compositor — Implementation with Windows Classic styling and decoupled WindowManager
+ */
+
 #include "Compositor.h"
 #include "Desktop.h"
 #include "TaskBar.h"
 #include "TaskManager.h"
 #include "AppScreen.h"
+#include "RetroGfx.h"
 
-#include <algorithm>
 #include <cstdio>
-#include <cstring>
-
+#include <algorithm>
 #include <GLFW/glfw3.h>
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -20,9 +24,13 @@ void glfwErrorCallback(int code, const char* description) {
 
 } // namespace
 
-const char* Compositor::appFiles()      { return "Files"; }
-const char* Compositor::appSettings()   { return "Settings"; }
-const char* Compositor::appTaskManager(){ return "Task Manager"; }
+void Compositor::setAppOpen(const std::string& id, bool open) {
+    if (open) {
+        m_windowManager.openApp(id);
+    } else {
+        m_windowManager.closeApp(id);
+    }
+}
 
 bool Compositor::init() {
     m_config.loadFromFile("config.txt");
@@ -47,16 +55,16 @@ bool Compositor::init() {
     }
 
     glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(1);   // vsync — the compositor presents on a steady cadence
+    glfwSwapInterval(1); // vsync
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
-    // Scale the UI up: the submission MP4 has to stay legible on a projector.
     ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = nullptr;              // keep the working folder clean
+    io.IniFilename = nullptr; // keep working folder clean
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.FontGlobalScale = 1.2f;
+    io.FontGlobalScale = m_config.uiScale;
+
     applyStyle();
 
     if (!ImGui_ImplGlfw_InitForOpenGL(m_window, true)) {
@@ -66,6 +74,7 @@ bool Compositor::init() {
         glfwTerminate();
         return false;
     }
+
     if (!ImGui_ImplOpenGL3_Init("#version 130")) {
         std::fprintf(stderr, "Failed to initialise the ImGui OpenGL 3 backend.\n");
         ImGui_ImplGlfw_Shutdown();
@@ -75,9 +84,10 @@ bool Compositor::init() {
         return false;
     }
 
-    registerApp(appFiles());
-    registerApp(appSettings());
-    registerApp(appTaskManager());
+    // ── Register Application Modules via Polymorphic WindowManager ──
+    m_windowManager.registerApp(std::make_shared<FilesApp>());
+    m_windowManager.registerApp(std::make_shared<SettingsApp>());
+    m_windowManager.registerApp(std::make_shared<TaskManagerApp>());
 
     m_simulator.init(m_config.processCount, m_config.rngSeed, m_config.minMemKb,
                      m_config.maxMemKb, m_config.minCpu, m_config.maxCpu,
@@ -89,29 +99,81 @@ bool Compositor::init() {
 
 void Compositor::applyStyle() {
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding    = 6.0f;
-    style.ChildRounding     = 4.0f;
-    style.FrameRounding     = 4.0f;
-    style.PopupRounding     = 4.0f;
-    style.ScrollbarRounding = 6.0f;
-    style.GrabRounding      = 4.0f;
-    style.WindowBorderSize  = 1.0f;
+
+    // ── Authentic Windows Classic Metrics (Sharp, square 3D corners) ──
+    style.WindowRounding    = 0.0f;
+    style.ChildRounding     = 0.0f;
+    style.FrameRounding     = 0.0f;
+    style.PopupRounding     = 0.0f;
+    style.ScrollbarRounding = 0.0f;
+    style.GrabRounding      = 0.0f;
+    style.TabRounding       = 0.0f;
+
+    style.WindowBorderSize  = 0.0f; // Remove harsh black border around window apps
+    style.ChildBorderSize   = 0.0f;
     style.FrameBorderSize   = 0.0f;
-    style.WindowPadding     = ImVec2(12.0f, 10.0f);
+    style.PopupBorderSize   = 1.0f;
+
+    style.WindowPadding     = ImVec2(8.0f, 8.0f);
+    style.FramePadding      = ImVec2(6.0f, 4.0f);
     style.ItemSpacing       = ImVec2(8.0f, 6.0f);
-    style.WindowTitleAlign  = ImVec2(0.5f, 0.5f);
-    style.Colors[ImGuiCol_WindowBg]            = ImVec4(0.10f, 0.11f, 0.14f, 0.96f);
-    style.Colors[ImGuiCol_TitleBg]              = ImVec4(0.13f, 0.15f, 0.19f, 1.00f);
-    style.Colors[ImGuiCol_TitleBgActive]        = ImVec4(0.20f, 0.30f, 0.52f, 1.00f);
-    style.Colors[ImGuiCol_Header]               = ImVec4(0.20f, 0.30f, 0.52f, 0.85f);
-    style.Colors[ImGuiCol_HeaderHovered]        = ImVec4(0.26f, 0.40f, 0.68f, 1.00f);
-    style.Colors[ImGuiCol_Button]               = ImVec4(0.18f, 0.22f, 0.30f, 1.00f);
-    style.Colors[ImGuiCol_ButtonHovered]        = ImVec4(0.26f, 0.38f, 0.62f, 1.00f);
-    style.Colors[ImGuiCol_ButtonActive]         = ImVec4(0.20f, 0.30f, 0.52f, 1.00f);
-    style.Colors[ImGuiCol_TableHeaderBg]        = ImVec4(0.16f, 0.19f, 0.25f, 1.00f);
-    style.Colors[ImGuiCol_TableRowBgAlt]        = ImVec4(1.00f, 1.00f, 1.00f, 0.025f);
-    style.Colors[ImGuiCol_CheckMark]            = ImVec4(0.42f, 0.72f, 1.00f, 1.00f);
-    style.ScaleAllSizes(1.15f);
+    style.ItemInnerSpacing  = ImVec2(6.0f, 4.0f);
+    style.WindowTitleAlign  = ImVec2(0.0f, 0.5f); // Left-aligned classic title
+
+    // ── Authentic Windows Classic (95/98/2000) Colors ──
+    const ImVec4 cBtnFace     = ImVec4(0.776f, 0.776f, 0.776f, 1.00f); // #C6C6C6
+    const ImVec4 cNavyActive  = ImVec4(0.000f, 0.000f, 0.502f, 1.00f); // #000080
+    const ImVec4 cNavyInact   = ImVec4(0.502f, 0.502f, 0.502f, 1.00f); // #808080
+    const ImVec4 cText        = ImVec4(0.000f, 0.000f, 0.000f, 1.00f); // Black text
+    const ImVec4 cClientWhite = ImVec4(1.000f, 1.000f, 1.000f, 1.00f); // White edit/list boxes
+    const ImVec4 cSoftBorder  = ImVec4(0.502f, 0.502f, 0.502f, 1.00f); // Soft gray border
+
+    style.Colors[ImGuiCol_Text]                  = cText;
+    style.Colors[ImGuiCol_TextDisabled]          = ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
+    style.Colors[ImGuiCol_WindowBg]              = cBtnFace;
+    style.Colors[ImGuiCol_ChildBg]               = cBtnFace;
+    style.Colors[ImGuiCol_PopupBg]               = cBtnFace;
+    style.Colors[ImGuiCol_Border]                = cSoftBorder;
+    style.Colors[ImGuiCol_BorderShadow]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    style.Colors[ImGuiCol_FrameBg]               = cClientWhite;
+    style.Colors[ImGuiCol_FrameBgHovered]        = cClientWhite;
+    style.Colors[ImGuiCol_FrameBgActive]         = cClientWhite;
+    style.Colors[ImGuiCol_TitleBg]               = cNavyInact;
+    style.Colors[ImGuiCol_TitleBgActive]         = cNavyActive;
+    style.Colors[ImGuiCol_TitleBgCollapsed]      = cNavyInact;
+    style.Colors[ImGuiCol_MenuBarBg]             = cBtnFace;
+    style.Colors[ImGuiCol_ScrollbarBg]           = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    style.Colors[ImGuiCol_ScrollbarGrab]         = cBtnFace;
+    style.Colors[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(0.85f, 0.85f, 0.85f, 1.00f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive]   = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    style.Colors[ImGuiCol_CheckMark]             = cText;
+    style.Colors[ImGuiCol_SliderGrab]            = cBtnFace;
+    style.Colors[ImGuiCol_SliderGrabActive]      = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    style.Colors[ImGuiCol_Button]                = cBtnFace;
+    style.Colors[ImGuiCol_ButtonHovered]         = ImVec4(0.85f, 0.85f, 0.85f, 1.00f);
+    style.Colors[ImGuiCol_ButtonActive]          = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    style.Colors[ImGuiCol_Header]                = cNavyActive;
+    style.Colors[ImGuiCol_HeaderHovered]         = ImVec4(0.06f, 0.38f, 0.75f, 1.00f);
+    style.Colors[ImGuiCol_HeaderActive]          = cNavyActive;
+    style.Colors[ImGuiCol_Separator]             = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    style.Colors[ImGuiCol_SeparatorHovered]      = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    style.Colors[ImGuiCol_SeparatorActive]       = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    style.Colors[ImGuiCol_ResizeGrip]            = ImVec4(0.50f, 0.50f, 0.50f, 0.60f);
+    style.Colors[ImGuiCol_ResizeGripHovered]     = ImVec4(0.00f, 0.00f, 0.50f, 0.80f);
+    style.Colors[ImGuiCol_ResizeGripActive]      = cNavyActive;
+    style.Colors[ImGuiCol_Tab]                   = cBtnFace;
+    style.Colors[ImGuiCol_TabHovered]            = ImVec4(0.85f, 0.85f, 0.85f, 1.00f);
+    style.Colors[ImGuiCol_TabActive]             = cBtnFace;
+    style.Colors[ImGuiCol_TabUnfocused]          = cBtnFace;
+    style.Colors[ImGuiCol_TabUnfocusedActive]   = cBtnFace;
+    style.Colors[ImGuiCol_PlotLines]             = ImVec4(0.00f, 0.80f, 0.20f, 1.00f);
+    style.Colors[ImGuiCol_PlotLinesHovered]      = ImVec4(0.00f, 1.00f, 0.30f, 1.00f);
+    style.Colors[ImGuiCol_PlotHistogram]         = ImVec4(0.00f, 0.00f, 0.50f, 1.00f);
+    style.Colors[ImGuiCol_TableHeaderBg]         = cBtnFace;
+    style.Colors[ImGuiCol_TableRowBg]            = cClientWhite;
+    style.Colors[ImGuiCol_TableRowBgAlt]         = ImVec4(0.96f, 0.96f, 0.96f, 1.00f);
+
+    style.ScaleAllSizes(m_config.uiScale);
 }
 
 void Compositor::run() {
@@ -126,7 +188,7 @@ void Compositor::run() {
         drawDesktopLayer();
         drawAppWindows();
         drawTaskBarLayer();
-        drawPwrLayer();      // must be last: PWR needs to sit on top of z-order
+        drawPwrLayer(); // Stays top-most in z-order
         endFrame();
     }
 }
@@ -146,7 +208,7 @@ void Compositor::endFrame() {
     ImGui::Render();
 
     glViewport(0, 0, static_cast<int>(m_viewport.x), static_cast<int>(m_viewport.y));
-    glClearColor(0.05f, 0.06f, 0.08f, 1.0f);
+    glClearColor(0.0f, 0.502f, 0.502f, 1.0f); // Default #008080 teal clear
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -165,7 +227,7 @@ void Compositor::shutdown() {
 }
 
 float Compositor::taskbarHeight() const {
-    return ImGui::GetFontSize() * 2.6f;
+    return std::max(38.0f * m_config.uiScale, ImGui::GetFontSize() * 2.5f);
 }
 
 ImVec2 Compositor::viewportSize() const {
@@ -183,38 +245,6 @@ void Compositor::desktopArea(ImVec2& outMin, ImVec2& outMax) const {
     }
 }
 
-void Compositor::registerApp(const std::string& title) {
-    for (const AppEntry& a : m_apps)
-        if (a.title == title) return;
-    m_apps.push_back(AppEntry{title, false});
-}
-
-void Compositor::setAppOpen(const std::string& title, bool open) {
-
-
-    for (AppEntry& a : m_apps) {
-        if (a.title != title) continue;
-        if (a.open == open) return;
-        a.open = open;
-        m_openAppCount += open ? 1 : -1;
-        if (open) m_focusedApp = title;
-        return;
-    }
-}
-
-bool Compositor::isAppOpen(const std::string& title) const {
-    for (const AppEntry& a : m_apps)
-        if (a.title == title) return a.open;
-    return false;
-}
-
-std::vector<std::string> Compositor::openAppTitles() const {
-    std::vector<std::string> titles;
-    for (const AppEntry& a : m_apps)
-        if (a.open) titles.push_back(a.title);
-    return titles;
-}
-
 void Compositor::drawDesktopLayer() {
     ImVec2 areaMin, areaMax;
     desktopArea(areaMin, areaMax);
@@ -222,32 +252,13 @@ void Compositor::drawDesktopLayer() {
 }
 
 void Compositor::drawAppWindows() {
-    for (AppEntry& app : m_apps) {
-        if (!app.open) continue;
-
-        bool keepOpen = true;
-        if (app.title == appFiles()) {
-            AppScreen::drawFiles(*this, &keepOpen);
-        } else if (app.title == appSettings()) {
-            AppScreen::drawSettings(*this, &keepOpen);
-        } else if (app.title == appTaskManager()) {
-            TaskManager::draw(*this, &keepOpen);
-        }
-        // Only let the window's own close button clear the flag;
-        // never write true back — that would resurrect a window the
-        // TaskBar just toggled closed.
-        if (!keepOpen) app.open = false;
-    }
-
-    // Recount in case a window was closed by its own close button.
-    m_openAppCount = 0;
-    for (const AppEntry& a : m_apps)
-        if (a.open) ++m_openAppCount;
+    m_windowManager.renderWindows(*this);
 }
 
 void Compositor::drawTaskBarLayer() {
     TaskBar::draw(*this);
 }
+
 void Compositor::drawPwrLayer() {
     ImVec2 areaMin, areaMax;
     desktopArea(areaMin, areaMax);

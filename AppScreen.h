@@ -1,24 +1,36 @@
 /*
- *  CSOPESY Semi-Major Output 2  —  Desktop-Style OS Mock-up
- *  Requirement B — the two unique UI screens
- *
- *  "Two of these buttons must open up a unique UI screen, with placeholder
- *   information. Any UI screen with your own design or layout is acceptable."
- *
- *  Both screens are intentionally different from each other and from the Task
- *  Manager: Files is a two-pane browser with a sidebar; Settings is a
- *  single-column form of grouped controls.  Every value shown is a
- *  placeholder — no filesystem or registry is touched.
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Requirement B — Files (Explorer) & Settings (Control Panel) in Windows Classic Style
  */
 
 #pragma once
-#include "imgui.h"
+#include "IAppWindow.h"
 
 class Compositor;
 
-namespace AppScreen {
+class FilesApp : public IAppWindow {
+public:
+    const std::string& id() const override { return m_id; }
+    const std::string& title() const override { return m_title; }
 
-void drawFiles(Compositor& compositor, bool* keepOpen);
-void drawSettings(Compositor& compositor, bool* keepOpen);
+    void render(Compositor& compositor, bool* keepOpen) override;
+    void drawIcon(ImDrawList* dl, const ImVec2& center, float size) override;
 
-} // namespace AppScreen
+private:
+    std::string m_id = "files";
+    std::string m_title = "Exploring - C:\\CSOPESY";
+};
+
+class SettingsApp : public IAppWindow {
+public:
+    const std::string& id() const override { return m_id; }
+    const std::string& title() const override { return m_title; }
+
+    void render(Compositor& compositor, bool* keepOpen) override;
+    void drawIcon(ImDrawList* dl, const ImVec2& center, float size) override;
+
+private:
+    std::string m_id = "settings";
+    std::string m_title = "Control Panel";
+    int m_activeTab = 0;
+};

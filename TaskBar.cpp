@@ -1,84 +1,162 @@
+/*
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Requirement B — TaskBar Implementation with Start Button, Window Tabs, and System Tray
+ */
+
 #include "TaskBar.h"
 #include "Compositor.h"
-
-#include <cmath>
+#include "RetroGfx.h"
+#include <ctime>
 #include <cstdio>
-
+#include <algorithm>
 
 namespace {
 
-const ImU32 kBarBg        = IM_COL32(16, 19, 26, 242);
-const ImU32 kBarBorder    = IM_COL32(46, 56, 76, 255);
-const ImU32 kIconIdle     = IM_COL32(178, 192, 214, 255);
-const ImU32 kIconHover    = IM_COL32(120, 186, 255, 255);
-const ImU32 kIconOpen     = IM_COL32(96, 220, 170, 255);
-const ImU32 kChipBg       = IM_COL32(32, 39, 52, 235);
-const ImU32 kChipBgActive = IM_COL32(44, 78, 132, 255);
+static bool s_startMenuOpen = false;
 
-// ── Icon painters (Requirement B: clickable *icon* buttons) ──
-void drawFolderIcon(ImDrawList* dl, const ImVec2& c, float s, ImU32 col) {
-    const float w = s * 0.92f, h = s * 0.68f;
-    const ImVec2 tl(c.x - w * 0.5f, c.y - h * 0.5f);
-    // Tab
-    dl->AddRectFilled(ImVec2(tl.x, tl.y), ImVec2(tl.x + w * 0.42f, tl.y + h * 0.28f), col, 2.0f);
-    // Body
-    dl->AddRectFilled(ImVec2(tl.x, tl.y + h * 0.20f), ImVec2(tl.x + w, tl.y + h), col, 2.0f);
-}
+// Scalable Quick Launch / Launcher Button
+bool drawTaskBarLauncher(const char* id, const char* tooltip, const char* appId,
+                         Compositor& compositor, ImVec2& cursor, float btnSize, float iconSize,
+                         void (*iconDrawer)(ImDrawList*, const ImVec2&, float)) {
+    const ImVec2 pMin = cursor;
+    const ImVec2 pMax(cursor.x + btnSize, cursor.y + btnSize);
 
-void drawGearIcon(ImDrawList* dl, const ImVec2& c, float s, ImU32 col) {
-    const float r = s * 0.34f;
-    for (int i = 0; i < 8; ++i) {
-        const float a = i * 3.14159265f / 4.0f;
-        const ImVec2 d(std::cos(a), std::sin(a));
-        dl->AddLine(ImVec2(c.x + d.x * r * 1.05f, c.y + d.y * r * 1.05f),
-                    ImVec2(c.x + d.x * r * 1.62f, c.y + d.y * r * 1.62f), col, 2.0f);
-    }
-    dl->AddCircleFilled(c, r, col, 20);
-    dl->AddCircleFilled(c, r * 0.42f, IM_COL32(16, 19, 26, 255), 16);
-}
+    ImGui::SetCursorScreenPos(pMin);
+    ImGui::InvisibleButton(id, ImVec2(btnSize, btnSize));
 
-void drawChartIcon(ImDrawList* dl, const ImVec2& c, float s, ImU32 col) {
-    const float w = s * 0.17f, gap = s * 0.10f;
-    const float base = c.y + s * 0.32f;
-    const float hs[3] = { s * 0.30f, s * 0.52f, s * 0.68f };
-    for (int i = 0; i < 3; ++i) {
-        const float x = c.x - s * 0.34f + static_cast<float>(i) * (w + gap);
-        dl->AddRectFilled(ImVec2(x, base - hs[i]), ImVec2(x + w, base), col, 1.5f);
-    }
-}
-
-// A launcher button: invisible hit area, then a vector icon on top.
-bool launcherButton(const char* id, ImVec2& cursor, const char* tooltip,
-                    bool open, void (*icon)(ImDrawList*, const ImVec2&, float, ImU32)) {
-    ImGui::SetCursorScreenPos(cursor);
-    ImGui::InvisibleButton(id, ImVec2(TaskBar::kIconSize, TaskBar::kIconSize));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool pressed = ImGui::IsItemActive();
+    const bool clicked = ImGui::IsItemClicked();
+    const bool isOpen  = compositor.windowManager().isAppOpen(appId);
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 pMin = ImGui::GetItemRectMin();
-    const ImVec2 pMax = ImGui::GetItemRectMax();
-    const bool  hov  = ImGui::IsItemHovered();
-    const bool  clk  = ImGui::IsItemClicked();
 
+    // 3D Bevel button
+    RetroGfx::draw3DBox(dl, pMin, pMax, pressed || isOpen, RetroGfx::kGrayFace);
 
-    if (hov || open) {
-        dl->AddRectFilled(pMin, pMax,
-                          open ? IM_COL32(30, 58, 52, 235) : IM_COL32(36, 48, 68, 235), 6.0f);
-        dl->AddRect(pMin, pMax, open ? IM_COL32(64, 150, 118, 200) : IM_COL32(72, 96, 136, 220),
-                    6.0f, 0, 1.0f);
+    const ImVec2 center(pMin.x + btnSize * 0.5f, pMin.y + btnSize * 0.5f);
+    iconDrawer(dl, center, iconSize);
+
+    // Active pip
+    if (isOpen) {
+        dl->AddRectFilled(ImVec2(pMin.x + 3.0f, pMax.y - 4.0f), ImVec2(pMax.x - 3.0f, pMax.y - 2.0f),
+                          IM_COL32(0, 180, 80, 255));
     }
 
-    const ImU32 col = open ? kIconOpen : (hov ? kIconHover : kIconIdle);
-    const ImVec2 centre((pMin.x + pMax.x) * 0.5f, (pMin.y + pMax.y) * 0.5f);
-    icon(dl, centre, TaskBar::kIconSize, col);
+    if (hovered) {
+        ImGui::SetTooltip("%s%s", tooltip, isOpen ? " (Running)" : "");
+    }
 
-    // Open indicator pip.
-    if (open)
-        dl->AddCircleFilled(ImVec2(centre.x, pMax.y - 3.0f), 2.0f, kIconOpen, 8);
+    cursor.x += btnSize + 4.0f;
+    return clicked;
+}
 
-    if (hov) ImGui::SetTooltip("%s%s", tooltip, open ? "  (running)" : "");
+// Start Menu Popup
+void drawStartMenu(Compositor& compositor, const ImVec2& barOrigin, float barH) {
+    if (!s_startMenuOpen) return;
 
-    cursor.x += TaskBar::kIconSize + TaskBar::kIconGap;
-    return clk;
+    const float uiScale = compositor.config().uiScale;
+    const float menuW = 210.0f * uiScale;
+    const float menuH = 240.0f * uiScale;
+    const bool barAtTop = compositor.config().taskbarAtTop;
+
+    const ImVec2 menuPos = barAtTop ? ImVec2(barOrigin.x, barOrigin.y + barH)
+                                    : ImVec2(barOrigin.x, barOrigin.y - menuH);
+
+    const ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize;
+
+    ImGui::SetNextWindowPos(menuPos);
+    ImGui::SetNextWindowSize(ImVec2(menuW, menuH));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(3.0f, 3.0f));
+    ImGui::Begin("##StartMenuPopup", &s_startMenuOpen, flags);
+    ImGui::PopStyleVar();
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 wMin = ImGui::GetWindowPos();
+    const ImVec2 wMax(wMin.x + menuW, wMin.y + menuH);
+
+    // Outer 3D bevel for Start menu
+    RetroGfx::draw3DBox(dl, wMin, wMax, false, RetroGfx::kGrayFace);
+
+    // Classic Windows 95/98 Left Vertical Banner
+    const float stripeW = 28.0f * uiScale;
+    const ImVec2 stripeMin(wMin.x + 3.0f, wMin.y + 3.0f);
+    const ImVec2 stripeMax(wMin.x + stripeW, wMax.y - 3.0f);
+    dl->AddRectFilledMultiColor(stripeMin, stripeMax,
+                                IM_COL32(0, 0, 128, 255), IM_COL32(0, 0, 128, 255),
+                                IM_COL32(16, 96, 192, 255), IM_COL32(16, 96, 192, 255));
+
+    // Vertical text indicator (drawn manually or labeled)
+    const float itemX = wMin.x + stripeW + 8.0f;
+    float itemY = wMin.y + 12.0f;
+    const float itemH = 34.0f * uiScale;
+    const float itemW = menuW - stripeW - 14.0f;
+
+    auto renderMenuItem = [&](const char* label, const char* appId, void (*icon)(ImDrawList*, const ImVec2&, float)) {
+        const ImVec2 miMin(itemX, itemY);
+        const ImVec2 miMax(itemX + itemW, itemY + itemH);
+
+        ImGui::SetCursorScreenPos(miMin);
+        ImGui::InvisibleButton(label, ImVec2(itemW, itemH));
+        const bool hov = ImGui::IsItemHovered();
+        const bool clk = ImGui::IsItemClicked();
+
+        if (hov) {
+            dl->AddRectFilled(miMin, miMax, RetroGfx::kNavyActive);
+        }
+
+        const ImVec2 iCenter(miMin.x + 18.0f, miMin.y + itemH * 0.5f);
+        icon(dl, iCenter, 22.0f * uiScale);
+
+        const float textY = miMin.y + (itemH - ImGui::GetFontSize()) * 0.5f;
+        dl->AddText(ImVec2(miMin.x + 38.0f, textY), hov ? RetroGfx::kWhite : RetroGfx::kBlack, label);
+
+        if (clk) {
+            if (appId) compositor.windowManager().openApp(appId);
+            s_startMenuOpen = false;
+        }
+
+        itemY += itemH + 2.0f;
+    };
+
+    renderMenuItem("Files (Explorer)", "files", RetroGfx::drawFolderIcon);
+    renderMenuItem("Settings", "settings", RetroGfx::drawSettingsIcon);
+    renderMenuItem("Task Manager", "taskmanager", RetroGfx::drawTaskManagerIcon);
+
+    // Separator line
+    itemY += 4.0f;
+    dl->AddLine(ImVec2(itemX, itemY), ImVec2(itemX + itemW, itemY), RetroGfx::kGrayShadow);
+    dl->AddLine(ImVec2(itemX, itemY + 1.0f), ImVec2(itemX + itemW, itemY + 1.0f), RetroGfx::kWhite);
+    itemY += 6.0f;
+
+    // Shut down option
+    const ImVec2 miMin(itemX, itemY);
+    const ImVec2 miMax(itemX + itemW, itemY + itemH);
+    ImGui::SetCursorScreenPos(miMin);
+    ImGui::InvisibleButton("##ShutdownMenu", ImVec2(itemW, itemH));
+    const bool sHov = ImGui::IsItemHovered();
+    const bool sClk = ImGui::IsItemClicked();
+
+    if (sHov) dl->AddRectFilled(miMin, miMax, RetroGfx::kNavyActive);
+    const ImVec2 pCenter(miMin.x + 18.0f, miMin.y + itemH * 0.5f);
+    RetroGfx::drawPowerIcon(dl, pCenter, 20.0f * uiScale);
+
+    const float sTextY = miMin.y + (itemH - ImGui::GetFontSize()) * 0.5f;
+    dl->AddText(ImVec2(miMin.x + 38.0f, sTextY), sHov ? RetroGfx::kWhite : RetroGfx::kBlack, "Shut Down...");
+
+    if (sClk) {
+        s_startMenuOpen = false;
+        compositor.requestShutdown();
+    }
+
+    ImGui::End();
+
+    // Close on click outside
+    if (ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+        // Will close on next frame
+    }
 }
 
 } // namespace
@@ -86,98 +164,185 @@ bool launcherButton(const char* id, ImVec2& cursor, const char* tooltip,
 void TaskBar::draw(Compositor& compositor) {
     const ImVec2 view = compositor.viewportSize();
     const float  barH = compositor.taskbarHeight();
-    const ImVec2 origin = compositor.config().taskbarAtTop ? ImVec2(0.0f, 0.0f)
-                                                           : ImVec2(0.0f, view.y - barH);
+    const bool   top  = compositor.config().taskbarAtTop;
+    const ImVec2 origin = top ? ImVec2(0.0f, 0.0f) : ImVec2(0.0f, view.y - barH);
+    const float  uiScale = compositor.config().uiScale;
 
     const ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
 
     ImGui::SetNextWindowPos(origin);
     ImGui::SetNextWindowSize(ImVec2(view.x, barH));
     ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::Begin("##TaskBar", nullptr, flags);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("##ClassicTaskBar", nullptr, flags);
+    ImGui::PopStyleVar();
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 pMin = ImGui::GetWindowPos();
     const ImVec2 pMax(pMin.x + view.x, pMin.y + barH);
-    dl->AddRectFilled(pMin, pMax, kBarBg, 0.0f);
-    dl->AddLine(pMin, ImVec2(pMax.x, pMin.y), kBarBorder, 1.0f);
-    dl->AddLine(ImVec2(pMin.x, pMax.y - 1.0f), ImVec2(pMax.x, pMax.y - 1.0f), kBarBorder, 1.0f);
 
-    const float padY = (barH - kIconSize) * 0.5f;
-    ImVec2 cursor(pMin.x + kIconPadX, pMin.y + padY);
-
-    // ── The three icon buttons ──
-    const bool openFiles = compositor.isAppOpen(Compositor::appFiles());
-    const bool openSet   = compositor.isAppOpen(Compositor::appSettings());
-    const bool openTm    = compositor.isAppOpen(Compositor::appTaskManager());
-
-    if (launcherButton("##btnFiles", cursor, "Files", openFiles, drawFolderIcon))
-        compositor.setAppOpen(Compositor::appFiles(), !openFiles);
-
-    if (launcherButton("##btnSettings", cursor, "Settings", openSet, drawGearIcon))
-        compositor.setAppOpen(Compositor::appSettings(), !openSet);
-
-    if (launcherButton("##btnTaskManager", cursor, "Task Manager", openTm, drawChartIcon))
-        compositor.setAppOpen(Compositor::appTaskManager(), !openTm);
-
-    // ── Divider, then the running-applications strip ──
-    const float divX = cursor.x + 4.0f;
-    dl->AddLine(ImVec2(divX, pMin.y + barH * 0.22f), ImVec2(divX, pMin.y + barH * 0.78f),
-                IM_COL32(58, 70, 92, 255), 1.0f);
-
-    float x = divX + 14.0f;
-    const float textH = ImGui::GetTextLineHeight();
-    const float cy = pMin.y + (barH - textH) * 0.5f;
-
-    const ProcessSimulator& sim = compositor.simulator();
-    char status[96];
-    std::snprintf(status, sizeof(status), "%d running  |  CPU %.0f%%  |  RAM %d/%d MB",
-                  sim.runningCount(), static_cast<double>(sim.totalCpuPercent()),
-                  sim.usedMemoryKb() / 1024, sim.totalMemoryKb() / 1024);
-    dl->AddText(ImVec2(x, cy), IM_COL32(150, 166, 192, 255), status);
-    x += ImGui::CalcTextSize(status).x + 22.0f;
-
-    // One clickable chip per open application window.
-    for (const std::string& title : compositor.openAppTitles()) {
-        const ImVec2 ts = ImGui::CalcTextSize(title.c_str());
-        const ImVec2 chipMin(x, pMin.y + padY);
-        const ImVec2 chipMax(x + ts.x + kChipPadX * 2.0f, pMin.y + padY + kIconSize);
-
-        ImGui::SetCursorScreenPos(chipMin);
-        ImGui::InvisibleButton(("##chip" + title).c_str(),
-                               ImVec2(chipMax.x - chipMin.x, chipMax.y - chipMin.y));
-        const bool hov = ImGui::IsItemHovered();
-        const bool clk = ImGui::IsItemClicked();
-
-        const bool focused = (compositor.focusedApp() == title);
-        dl->AddRectFilled(chipMin, chipMax,
-                          hov || focused ? kChipBgActive : kChipBg, 6.0f);
-        dl->AddRect(chipMin, chipMax, focused ? IM_COL32(96, 152, 232, 220) : IM_COL32(64, 76, 98, 220),
-                    6.0f, 0, 1.0f);
-        dl->AddText(ImVec2(chipMin.x + kChipPadX, pMin.y + (barH - textH) * 0.5f),
-                    IM_COL32(220, 230, 245, 255), title.c_str());
-
-        if (hov) ImGui::SetTooltip("%s — click to bring to front", title.c_str());
-        if (clk) compositor.setFocusedApp(title);
-
-        x = chipMax.x + 8.0f;
-        if (x > pMax.x - 200.0f) break;   // leave room for the tray
+    // ── 1. Classic Taskbar Background & Raised 3D Shelf ──
+    dl->AddRectFilled(pMin, pMax, RetroGfx::kGrayFace);
+    if (top) {
+        // Bottom border if top-docked
+        dl->AddLine(ImVec2(pMin.x, pMax.y - 1.0f), ImVec2(pMax.x, pMax.y - 1.0f), RetroGfx::kGrayShadow, 1.0f);
+        dl->AddLine(ImVec2(pMin.x, pMax.y), ImVec2(pMax.x, pMax.y), RetroGfx::kBlack, 1.0f);
+    } else {
+        // Top border if bottom-docked: White highlight on top, giving 3D raised shelf
+        dl->AddLine(ImVec2(pMin.x, pMin.y), ImVec2(pMax.x, pMin.y), RetroGfx::kWhite, 1.5f);
+        dl->AddLine(ImVec2(pMin.x, pMin.y + 1.0f), ImVec2(pMax.x, pMin.y + 1.0f), RetroGfx::kGrayLight, 1.0f);
     }
 
-    if (compositor.openAppCount() == 0) {
-        dl->AddText(ImVec2(x, cy), IM_COL32(104, 116, 138, 255), "no applications running");
+    const float padY = 4.0f;
+    const float btnH = barH - padY * 2.0f;
+    ImVec2 cursor(pMin.x + 4.0f, pMin.y + padY);
+
+    // ── 2. The Classic "Start" Button ──
+    const float startW = 86.0f * uiScale;
+    const ImVec2 startMin = cursor;
+    const ImVec2 startMax(cursor.x + startW, cursor.y + btnH);
+
+    ImGui::SetCursorScreenPos(startMin);
+    ImGui::InvisibleButton("##StartButton", ImVec2(startW, btnH));
+    const bool startPressed = ImGui::IsItemActive() || s_startMenuOpen;
+    const bool startClicked = ImGui::IsItemClicked();
+
+    if (startClicked) {
+        s_startMenuOpen = !s_startMenuOpen;
     }
 
-    // ── System tray ──
-    const std::string focused = compositor.focusedApp();
-    const std::string trayText = focused.empty() ? std::string("CSOPESY SMO2  |  shell ready")
-                                                 : ("focus: " + focused);
-    const ImVec2 traySize = ImGui::CalcTextSize(trayText.c_str());
-    dl->AddText(ImVec2(pMax.x - traySize.x - 16.0f, cy), IM_COL32(128, 142, 168, 255), trayText.c_str());
+    // 3D Beveled Start button (sunken when open/active)
+    RetroGfx::draw3DBox(dl, startMin, startMax, startPressed, RetroGfx::kGrayFace);
+
+    // Windows 4-color Logo
+    const ImVec2 logoCenter(startMin.x + 18.0f * uiScale, startMin.y + btnH * 0.5f);
+    RetroGfx::drawWindowsFlag(dl, logoCenter, 18.0f * uiScale);
+
+    // Bold "Start" Text
+    const ImVec2 sSize = ImGui::CalcTextSize("Start");
+    const ImVec2 sTextPos(logoCenter.x + 14.0f * uiScale, startMin.y + (btnH - sSize.y) * 0.5f);
+    dl->AddText(sTextPos, RetroGfx::kBlack, "Start");
+
+    cursor.x += startW + 6.0f;
+
+    // ── 3. Quick Launch Separator & Icons ──
+    // Sunken vertical bar divider
+    dl->AddLine(ImVec2(cursor.x, pMin.y + 4.0f), ImVec2(cursor.x, pMax.y - 4.0f), RetroGfx::kGrayShadow);
+    dl->AddLine(ImVec2(cursor.x + 1.0f, pMin.y + 4.0f), ImVec2(cursor.x + 1.0f, pMax.y - 4.0f), RetroGfx::kWhite);
+    cursor.x += 6.0f;
+
+    const float qIconSize = btnH;
+    const float graphicSize = 22.0f * uiScale;
+
+    if (drawTaskBarLauncher("##qlFiles", "Files (Explorer)", "files", compositor, cursor, qIconSize, graphicSize, RetroGfx::drawFolderIcon)) {
+        compositor.windowManager().toggleApp("files");
+    }
+    if (drawTaskBarLauncher("##qlSettings", "Settings", "settings", compositor, cursor, qIconSize, graphicSize, RetroGfx::drawSettingsIcon)) {
+        compositor.windowManager().toggleApp("settings");
+    }
+    if (drawTaskBarLauncher("##qlTaskMgr", "Task Manager", "taskmanager", compositor, cursor, qIconSize, graphicSize, RetroGfx::drawTaskManagerIcon)) {
+        compositor.windowManager().toggleApp("taskmanager");
+    }
+
+    // Divider after Quick Launch
+    cursor.x += 2.0f;
+    dl->AddLine(ImVec2(cursor.x, pMin.y + 4.0f), ImVec2(cursor.x, pMax.y - 4.0f), RetroGfx::kGrayShadow);
+    dl->AddLine(ImVec2(cursor.x + 1.0f, pMin.y + 4.0f), ImVec2(cursor.x + 1.0f, pMax.y - 4.0f), RetroGfx::kWhite);
+    cursor.x += 8.0f;
+
+    // ── 4. System Tray (Notification Area on the Right) ──
+    const float trayW = 180.0f * uiScale;
+    const ImVec2 trayMin(pMax.x - trayW - 6.0f, pMin.y + padY);
+    const ImVec2 trayMax(pMax.x - 6.0f, pMin.y + padY + btnH);
+
+    // Sunken 3D border for notification tray
+    RetroGfx::drawSunkenBorder(dl, trayMin, trayMax, RetroGfx::kGrayFace);
+
+    // Tray icons: Speaker and Network
+    const float trayCenterY = trayMin.y + btnH * 0.5f;
+    RetroGfx::drawSpeakerIcon(dl, ImVec2(trayMin.x + 18.0f, trayCenterY), 18.0f * uiScale);
+    RetroGfx::drawNetworkIcon(dl, ImVec2(trayMin.x + 40.0f, trayCenterY), 18.0f * uiScale);
+
+    // Tray Shutdown button
+    const float pwrBtnSize = btnH - 6.0f;
+    const ImVec2 trayPwrMin(trayMin.x + 58.0f * uiScale, trayMin.y + 3.0f);
+    ImGui::SetCursorScreenPos(trayPwrMin);
+    const bool trayPwrClicked = ImGui::InvisibleButton("##TrayShutdown", ImVec2(pwrBtnSize, pwrBtnSize));
+    const bool trayPwrHov = ImGui::IsItemHovered();
+    RetroGfx::drawPowerIcon(dl, ImVec2(trayPwrMin.x + pwrBtnSize * 0.5f, trayPwrMin.y + pwrBtnSize * 0.5f), 15.0f * uiScale);
+    if (trayPwrHov) {
+        ImGui::SetTooltip("Shut Down CSOPESY OS");
+    }
+    if (trayPwrClicked) {
+        compositor.requestShutdown();
+    }
+
+    // Tray Clock
+    const std::time_t now = std::time(nullptr);
+    std::tm local {};
+    localtime_s(&local, &now);
+    char trayTime[32];
+    std::strftime(trayTime, sizeof(trayTime), "%I:%M %p", &local);
+    const char* tt = (trayTime[0] == '0') ? trayTime + 1 : trayTime;
+
+    const ImVec2 ttSize = ImGui::CalcTextSize(tt);
+    const float ttX = trayMax.x - ttSize.x - 8.0f;
+    const float ttY = trayMin.y + (btnH - ttSize.y) * 0.5f;
+    dl->AddText(ImVec2(ttX, ttY), RetroGfx::kBlack, tt);
+
+    // ── 5. Running Application Taskbar Tabs (Windows 95/98 style) ──
+    const float maxTabArea = trayMin.x - cursor.x - 10.0f;
+    const auto& entries = compositor.windowManager().entries();
+
+    int openCount = 0;
+    for (const auto& e : entries) {
+        if (e.open) openCount++;
+    }
+
+    if (openCount > 0) {
+        const float tabW = std::min(170.0f * uiScale, (maxTabArea - (openCount - 1) * 4.0f) / openCount);
+
+        for (const auto& e : entries) {
+            if (!e.open) continue;
+
+            const ImVec2 tabMin = cursor;
+            const ImVec2 tabMax(cursor.x + tabW, cursor.y + btnH);
+
+            ImGui::SetCursorScreenPos(tabMin);
+            ImGui::InvisibleButton(("##tab" + e.app->id()).c_str(), ImVec2(tabW, btnH));
+            const bool tabClicked = ImGui::IsItemClicked();
+            const bool isFocused = compositor.windowManager().isAppFocused(e.app->id());
+
+            // Focused window tab has sunken bevel, unfocused has raised bevel
+            RetroGfx::draw3DBox(dl, tabMin, tabMax, isFocused, isFocused ? RetroGfx::kGrayLight : RetroGfx::kGrayFace);
+
+            // App Icon
+            const ImVec2 aCenter(tabMin.x + 16.0f, tabMin.y + btnH * 0.5f);
+            e.app->drawIcon(dl, aCenter, 18.0f * uiScale);
+
+            // App Title truncated with clip
+            ImGui::PushClipRect(ImVec2(tabMin.x + 28.0f, tabMin.y), ImVec2(tabMax.x - 4.0f, tabMax.y), true);
+            const float titleY = tabMin.y + (btnH - ImGui::GetFontSize()) * 0.5f;
+            dl->AddText(ImVec2(tabMin.x + 28.0f, titleY), RetroGfx::kBlack, e.app->title().c_str());
+            ImGui::PopClipRect();
+
+            if (tabClicked) {
+                if (isFocused) {
+                    // Minimize or keep
+                } else {
+                    compositor.windowManager().setFocusedApp(e.app->id());
+                }
+            }
+
+            cursor.x += tabW + 4.0f;
+        }
+    }
 
     ImGui::End();
+
+    // Draw Start Menu if open
+    drawStartMenu(compositor, pMin, barH);
 }

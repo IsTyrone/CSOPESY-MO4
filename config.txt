@@ -1,7 +1,7 @@
-# CSOPESY Semi-Major Output 2 — runtime parameters
+# CSOPESY Semi-Major Output 2 / MO4 — Runtime Parameters
 #
 # Every value below is read at startup.  The mock-up can be re-configured
-# without recompiling: edit this file and run csopesy.exe again.
+# without recompiling: edit this file and launch the application again.
 # Lines starting with '#' and blank lines are ignored.
 
 # Host window size (minimum 800 x 600)
@@ -17,12 +17,20 @@ max-mem-kb         65536
 total-mem-kb       262144
 update-interval-ms 180
 
-# Seed for the process generator.  The same seed always replays the
-# same sequence of readings, which keeps black-box test runs reproducible.
+# Seed for the process generator (keeps black-box runs 100% reproducible)
 rng-seed           20260918
 
-# Shell layout
-taskbar-position   top
+# Shell layout: bottom (Classic Windows standard) | top
+taskbar-position   bottom
 
-# Wallpaper: gradient | pattern | plain
-wallpaper-mode     gradient
+# Wallpaper style: classic-teal | gradient | bliss | pattern | plain
+wallpaper-mode     classic-teal
+
+# UI and Icon scaling factor (e.g., 1.25, 1.5 - enlarges icons for high-res screens)
+ui-scale           1.25
+
+# Show desktop shortcut icons (Files, Settings, Task Manager)
+show-desktop-icons true
+
+# Theme mode: classic | modern
+theme              classic

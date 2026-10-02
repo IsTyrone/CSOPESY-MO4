@@ -1,3 +1,8 @@
+/*
+ *  CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+ *  Config — Implementation
+ */
+
 #include "Config.h"
 #include <algorithm>
 #include <cstdlib>
@@ -34,23 +39,26 @@ bool Config::loadFromFile(const std::string& path) {
 
         value = stripQuotes(value);
 
-        if      (key == "framebuffer-width")  framebufferWidth  = std::atoi(value.c_str());
-        else if (key == "framebuffer-height") framebufferHeight = std::atoi(value.c_str());
-        else if (key == "process-count")      processCount      = std::atoi(value.c_str());
-        else if (key == "min-cpu")            minCpu            = static_cast<float>(std::atof(value.c_str()));
-        else if (key == "max-cpu")            maxCpu            = static_cast<float>(std::atof(value.c_str()));
-        else if (key == "min-mem-kb")         minMemKb          = std::atoi(value.c_str());
-        else if (key == "max-mem-kb")         maxMemKb          = std::atoi(value.c_str());
-        else if (key == "total-mem-kb")       totalMemKb        = std::atoi(value.c_str());
-        else if (key == "update-interval-ms") updateIntervalMs  = std::atoi(value.c_str());
-        else if (key == "rng-seed")           rngSeed           = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 10));
-        else if (key == "taskbar-position")   taskbarAtTop      = (value == "top");
-        else if (key == "wallpaper-mode")     wallpaperMode     = value;
+        if      (key == "framebuffer-width")   framebufferWidth   = std::atoi(value.c_str());
+        else if (key == "framebuffer-height")  framebufferHeight  = std::atoi(value.c_str());
+        else if (key == "process-count")       processCount       = std::atoi(value.c_str());
+        else if (key == "min-cpu")             minCpu             = static_cast<float>(std::atof(value.c_str()));
+        else if (key == "max-cpu")             maxCpu             = static_cast<float>(std::atof(value.c_str()));
+        else if (key == "min-mem-kb")          minMemKb           = std::atoi(value.c_str());
+        else if (key == "max-mem-kb")          maxMemKb           = std::atoi(value.c_str());
+        else if (key == "total-mem-kb")        totalMemKb         = std::atoi(value.c_str());
+        else if (key == "update-interval-ms")  updateIntervalMs   = std::atoi(value.c_str());
+        else if (key == "rng-seed")            rngSeed            = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 10));
+        else if (key == "taskbar-position")    taskbarAtTop       = (value == "top");
+        else if (key == "wallpaper-mode")      wallpaperMode      = value;
+        else if (key == "ui-scale")            uiScale            = static_cast<float>(std::atof(value.c_str()));
+        else if (key == "show-desktop-icons")  showDesktopIcons   = (value == "true" || value == "1" || value == "yes");
+        else if (key == "theme")               theme              = value;
     }
 
-    // Guard rails: keep malformed values from producing an unusable mock-up.
-    if (processCount < 1)     processCount     = 1;
-    if (processCount > 64)    processCount     = 64;
+    // Guard rails
+    if (processCount < 1)       processCount       = 1;
+    if (processCount > 64)      processCount       = 64;
     if (framebufferWidth < 800)  framebufferWidth  = 800;
     if (framebufferHeight < 600) framebufferHeight = 600;
     if (updateIntervalMs < 16)   updateIntervalMs  = 16;
@@ -58,6 +66,8 @@ bool Config::loadFromFile(const std::string& path) {
     if (maxMemKb < minMemKb)     maxMemKb          = minMemKb;
     if (minMemKb < 64)           minMemKb          = 64;
     if (totalMemKb < maxMemKb)   totalMemKb        = maxMemKb * processCount;
+    if (uiScale < 0.75f)         uiScale           = 0.75f;
+    if (uiScale > 2.50f)         uiScale           = 2.50f;
 
     loaded = true;
     return true;
@@ -75,6 +85,8 @@ std::vector<std::string> Config::dump() const {
     out.push_back("  rng-seed:            " + std::to_string(rngSeed));
     out.push_back("  taskbar-position:    " + std::string(taskbarAtTop ? "top" : "bottom"));
     out.push_back("  wallpaper-mode:      " + wallpaperMode);
+    out.push_back("  ui-scale:            " + std::to_string(uiScale));
+    out.push_back("  theme:               " + theme);
     out.push_back("  config.txt loaded:   " + std::string(loaded ? "yes" : "no (using defaults)"));
     out.push_back("---------------------");
     return out;
