@@ -1,79 +1,157 @@
-CSOPESY Semi-Major Output 2 — Desktop-Style OS Mock-up
-=======================================================
+===============================================================================
+CSOPESY Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+De La Salle University — Operating Systems
+===============================================================================
 
-Description
+ENTRY CLASS / FILE
+------------------
+  Entry File : main.cpp
+  Function   : int main()
+  Role       : Boots the Compositor (GLFW + OpenGL 3.3 + Dear ImGui) and
+               enters the main render loop.
+
+
+DESCRIPTION
 -----------
-A desktop-style operating-system mock-up built with C++17, GLFW 3.4, OpenGL 3.3,
-and Dear ImGui v1.91.9b.  The application renders a compositor-driven desktop
-environment with a taskbar, launcher icons, application windows, a real-time
-clock, wallpaper, and a PWR (power) button to shut down the mock OS.
+A compositor-driven, desktop-style operating-system mock-up built with C++17,
+Dear ImGui v1.91.9b, GLFW 3.4, and an OpenGL 3.3 Core Profile.
 
-Features
---------
-  • Wallpaper layer — full-window gradient/pattern, drawn first every frame
-  • Real-time clock — updates every frame, displayed on the desktop
-  • Taskbar — fixed bar (top or bottom per config) with three icon launchers:
-      - Files — placeholder file-browser screen
-      - Settings — placeholder settings screen
-      - Task Manager — live process table driven by the process simulator
-  • Running-app indicators — icon turns green + pip; chip appears in the bar
-  • Toggle open/close — second icon click closes the window
-  • PWR button — sole exit path; closes the application cleanly (exit code 0)
-  • config.txt — all parameters (resolution, process count, taskbar position,
-    wallpaper mode, etc.) can be changed without recompiling
+The application emulates a modern desktop environment with:
+  • Wallpaper background layer (gradient, pattern, or plain via ImGui commands)
+  • Real-time digital clock updating every frame
+  • Fixed taskbar (dockable to top or bottom via config)
+  • Three application launcher icons:
+      1. Files          - Two-pane file browser screen with placeholder data
+      2. Settings       - Categorized system configuration mock screen
+      3. Task Manager   - Interactive process table showing live CPU/RAM metrics
+  • Active application indicators (green tint, status pip, and taskbar chip)
+  • Toggle window controls (click launcher icon to toggle open/minimized)
+  • Clean shutdown PWR button on the desktop (only exit path, exit code 0)
+  • Dynamic runtime configuration via config.txt without recompilation
 
-Building
---------
-Prerequisites:  see prerequisite.md
 
-  1.  Clone the repository and open a terminal (Command Prompt or PowerShell)
-      in the cloned folder:
+PREREQUISITES
+-------------
+  • OS: Windows 10 or 11 (64-bit)
+  • Compiler: MinGW-w64 g++ (GCC 8+ with C++17 support) on system PATH
+  • Graphics: GPU supporting OpenGL 3.3 Core Profile
+  • Note: GLFW 3.4 and Dear ImGui are pre-packaged under third_party/;
+          no additional external downloads are required.
 
-          git clone https://github.com/IsTyrone/CSOPESY-MO4.git
-          cd CSOPESY-MO4
-  2.  Run:
-          build.bat
-  3.  On success the output is csopesy.exe in the same folder.
+To verify g++ is installed and accessible:
+    g++ --version
 
-  build.bat links the MinGW runtime statically, so csopesy.exe is
-  self-contained and needs no additional DLLs.
 
-To clean the build artefacts:
-          build.bat clean
+HOW TO BUILD PROPERLY
+---------------------
+1. Open PowerShell or Command Prompt in the project folder:
+     cd CSOPESY-MO4
 
-Running
--------
+2. Run the build script:
+     In PowerShell:
+         .\build.bat
+
+     In Command Prompt (CMD):
+         build.bat
+
+3. The script compiles all sources with:
+     -std=c++17 -O2 -Wall -static-libgcc -static-libstdc++
+
+   The static flags ensure csopesy.exe is completely standalone and will
+   not fail due to missing MinGW DLLs (e.g., libstdc++-6-x64.dll).
+
+To clean build artefacts:
+     .\build.bat clean   (PowerShell)
+     build.bat clean     (Command Prompt)
+
+
+HOW TO RUN PROPERLY
+-------------------
+IMPORTANT (PowerShell Users):
+In Windows PowerShell, executables in the current working directory MUST be
+prefixed with ".\" or they will fail with a "term not recognized" error.
+
+  In PowerShell:
+      .\csopesy.exe
+
+  In Command Prompt (CMD):
       csopesy.exe
 
-The mock-up reads config.txt at startup.  Edit that file to change the window
-size, process count, memory limits, taskbar position, wallpaper mode, etc.
+A window titled "CSOPESY SMO2 — Desktop-Style OS Mock-up" will open at the
+dimensions specified in config.txt (default: 1280x800).
 
-A window always opens at the configured size, titled
-"CSOPESY SMO2 - Desktop-Style OS Mock-up".  If the process starts but no
-window appears, the exe was linked against the MinGW runtime DLLs and they are
-missing from PATH -- see the troubleshooting table in prerequisite.md.
 
-Controls
---------
-  • Click a launcher icon to open its window; click the same icon again to close it.
-  • Click the X on a window's title bar to close it.
-  • Click the PWR button to shut the mock OS down (this is the only exit path).
+USER CONTROLS
+-------------
+  • Launch an app     : Click its icon on the taskbar.
+  • Close/toggle app  : Click the active taskbar icon again, or click [X] on
+                        the window title bar.
+  • Reposition window : Click and drag the window title bar.
+  • Shutdown Mock OS  : Click the red PWR button on the desktop.
+                        This is the designated shutdown method.
 
-Project Structure
+
+CONFIGURATION (config.txt)
+--------------------------
+Edit config.txt in any text editor to modify parameters without recompiling:
+
+  framebuffer-width    : Window width in pixels (min 800)
+  framebuffer-height   : Window height in pixels (min 600)
+  process-count        : Number of simulated processes (default 6)
+  min-cpu / max-cpu    : CPU percentage range per process
+  min-mem-kb           : Minimum simulated RAM in KB per process
+  max-mem-kb           : Maximum simulated RAM in KB per process
+  total-mem-kb         : Total system simulated memory in KB
+  update-interval-ms   : Refresh cadence for simulated readings (in ms)
+  rng-seed             : Seed for deterministic process readings
+  taskbar-position     : "top" or "bottom"
+  wallpaper-mode       : "gradient", "pattern", or "plain"
+
+
+PROJECT STRUCTURE
 -----------------
-  main.cpp               Entry point
-  Compositor.cpp / .h    Host window, ImGui backends, layer stack, app registry
-  Desktop.cpp / .h       Wallpaper, clock, PWR button
-  TaskBar.cpp / .h       Taskbar strip, launcher icons, running-app chips
-  TaskManager.cpp / .h   Task Manager window (live process table)
-  AppScreen.cpp / .h     Files and Settings placeholder screens
-  ProcessSimulator.cpp / .h   Simulated process model (CPU, memory readings)
-  Config.cpp / .h        Runtime parameters loaded from config.txt
-  config.txt             User-editable runtime configuration
-  build.bat              One-step build script (MinGW g++)
-  prerequisite.md        Software prerequisites and setup guide
-  third_party/           Vendored GLFW and Dear ImGui sources
+  main.cpp                 Program entry point (int main)
+  Compositor.h / .cpp      Compositor, window loop, and layer management
+  Desktop.h / .cpp         Wallpaper rendering, live clock, PWR shutdown button
+  TaskBar.h / .cpp         Taskbar strip, launcher buttons, active app chips
+  TaskManager.h / .cpp     Live process table and CPU/RAM summary display
+  AppScreen.h / .cpp       Files explorer and Settings placeholder screens
+  ProcessSimulator.h / .cpp Deterministic simulated process telemetry model
+  Config.h / .cpp          Runtime parser for config.txt
+  config.txt               Runtime parameters loaded at startup
+  build.bat                One-step build and static verification script
+  prerequisite.md          Setup instructions and prerequisite notes
+  README.md                Full documentation with GitHub markdown formatting
+  README.txt               Plain-text submission information and run instructions
+  third_party/             Vendored GLFW 3.4 and Dear ImGui v1.91.9b sources
 
-Authors
--------
-  CSOPESY — Operating Systems course project
+
+TROUBLESHOOTING
+---------------
+  1. "csopesy.exe : The term 'csopesy.exe' is not recognized..."
+     --> You are using PowerShell. Prefix the command with ".\":
+         .\csopesy.exe
+
+  2. "'g++' is not recognized as an internal or external command..."
+     --> MinGW bin directory is not in your system PATH. Add your MinGW
+         bin folder (e.g. C:\msys64\ucrt64\bin) to PATH and restart terminal.
+
+  3. Process starts but no window appears:
+     --> The binary was linked dynamically against missing MinGW DLLs.
+         Rebuild using ".\build.bat", which enforces static runtime linking.
+
+  4. Crash or black screen on launch:
+     --> Verify that your graphics card driver supports OpenGL 3.3 Core Profile.
+
+
+AUTHORS & SUBMISSION DETAILS
+----------------------------
+Course  : CSOPESY — Operating Systems
+Project : Semi-Major Output 2 / MO4 — Desktop-Style OS Mock-up
+
+Group Members:
+  1. [Name] - [ID Number]
+  2. [Name] - [ID Number]
+  3. [Name] - [ID Number]
+  4. [Name] - [ID Number]
+===============================================================================
