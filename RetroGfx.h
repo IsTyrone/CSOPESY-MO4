@@ -54,4 +54,9 @@ void drawSpeakerIcon(ImDrawList* dl, const ImVec2& center, float size);
 // System Tray: Network Monitors
 void drawNetworkIcon(ImDrawList* dl, const ImVec2& center, float size);
 
+// ── Window Title Bar Controls ────────────────────────────────────
+void drawMinimizeIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, float scale);
+void drawMaximizeIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, bool isMaximized, float scale);
+void drawCloseIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, float scale);
+
 } // namespace RetroGfx

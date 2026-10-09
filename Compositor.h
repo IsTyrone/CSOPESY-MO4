@@ -36,10 +36,12 @@ public:
     void                     setFocusedApp(const std::string& id) { m_windowManager.setFocusedApp(id); }
     const std::string&       focusedApp() const { return m_windowManager.focusedApp(); }
 
-    // ── Screen Geometry ──
+    // ── Screen Geometry & Dynamic Scaling ──
     ImVec2 viewportSize() const;
     float  taskbarHeight() const;
     void   desktopArea(ImVec2& outMin, ImVec2& outMax) const;
+    float  effectiveScale() const { return m_effectiveScale; }
+    void   onConfigChanged() { m_lastAppliedScale = -1.0f; }
 
     const Config&           config() const    { return m_config; }
     const ProcessSimulator& simulator() const { return m_simulator; }
@@ -55,8 +57,9 @@ public:
     static const char* appTaskManager() { return "taskmanager"; }
 
 private:
-    void applyStyle();
-    void beginFrame();
+    float computeEffectiveScale() const;
+    void  applyStyle(float scale);
+    void  beginFrame();
     void endFrame();
     void drawBootLayer(double now);
     void drawDesktopLayer();
@@ -77,4 +80,8 @@ private:
     double m_bootStart = -1.0;   // glfwGetTime() at run() entry; -1 = boot not started
     bool   m_bootDone = false;   // true once the XP splash has finished / been skipped
     ImVec2 m_viewport = ImVec2(0.0f, 0.0f);
+    float  m_effectiveScale = 1.25f;
+    float  m_lastAppliedScale = -1.0f;
+    ImVec2 m_lastDesktopMin = ImVec2(0.0f, 0.0f);
+    ImVec2 m_lastDesktopMax = ImVec2(0.0f, 0.0f);
 };

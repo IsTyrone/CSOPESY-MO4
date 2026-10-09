@@ -6,6 +6,7 @@
 #include "BootScreen.h"
 #include <cfloat>
 #include <cmath>
+#include <algorithm>
 
 namespace {
 
@@ -69,35 +70,41 @@ void BootScreen::draw(const ImVec2& view, double elapsedSec,
     // ── 1. Black screen ──
     dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(0, 0, 0, 255));
 
+    const float scale = std::clamp(std::min(view.x / 1280.0f, view.y / 800.0f), 0.75f, 3.0f);
     ImFont* font = ImGui::GetFont();
     const float cx = view.x * 0.5f;
     const float logoCy = view.y * 0.40f;
 
     // ── 2. Center logo: image file, vector lockup as fallback ──
-    constexpr float kBarW = 210.0f, kBarH = 18.0f;
+    const float kBarW = 210.0f * scale;
+    const float kBarH = 18.0f * scale;
     const float barX = cx - kBarW * 0.5f;
-    float barY = logoCy + 96.0f;
+    float barY = logoCy + 96.0f * scale;
 
     if (logoTex != 0 && logoW > 0 && logoH > 0) {
-        // Shrink-to-fit inside a box; never upscale so the logo stays crisp.
+        // Shrink-to-fit inside a box; scale with display
         const float maxW = view.x * 0.70f;
         const float maxH = view.y * 0.42f;
         float fit = std::min(maxW / static_cast<float>(logoW),
                              maxH / static_cast<float>(logoH));
-        if (fit > 1.0f) fit = 1.0f;
+        if (fit > scale) fit = scale;
         const float dw = static_cast<float>(logoW) * fit;
         const float dh = static_cast<float>(logoH) * fit;
 
-        const float imgCy = logoCy - 10.0f;
+        const float imgCy = logoCy - 10.0f * scale;
         dl->AddImage(logoTex,
                      ImVec2(cx - dw * 0.5f, imgCy - dh * 0.5f),
                      ImVec2(cx + dw * 0.5f, imgCy + dh * 0.5f));
 
-        barY = imgCy + dh * 0.5f + 44.0f;
+        barY = imgCy + dh * 0.5f + 44.0f * scale;
     } else {
         // Built-in vector lockup: waving flag (left) + wordmark (right)
-        constexpr float kFlagW = 150.0f, kFlagH = 116.0f, kGap = 26.0f;
-        constexpr float kBrandSize = 25.0f, kNameSize = 56.0f, kEditionSize = 23.0f;
+        const float kFlagW = 150.0f * scale;
+        const float kFlagH = 116.0f * scale;
+        const float kGap = 26.0f * scale;
+        const float kBrandSize = 25.0f * scale;
+        const float kNameSize = 56.0f * scale;
+        const float kEditionSize = 23.0f * scale;
 
         const float windowsW =
             font->CalcTextSizeA(kNameSize, FLT_MAX, 0.0f, "Windows").x;
@@ -108,26 +115,26 @@ void BootScreen::draw(const ImVec2& view, double elapsedSec,
         const float editionW =
             font->CalcTextSizeA(kEditionSize, FLT_MAX, 0.0f, "Professional").x;
 
-        float textW = windowsW + 6.0f + xpW;
+        float textW = windowsW + 6.0f * scale + xpW;
         if (brandW > textW)   textW = brandW;
         if (editionW > textW) textW = editionW;
 
         const float lockX = cx - (kFlagW + kGap + textW) * 0.5f;
         const float tx = lockX + kFlagW + kGap;
 
-        drawXpFlag(dl, ImVec2(lockX + kFlagW * 0.5f, logoCy - 8.0f), kFlagW, kFlagH);
+        drawXpFlag(dl, ImVec2(lockX + kFlagW * 0.5f, logoCy - 8.0f * scale), kFlagW, kFlagH);
 
-        dl->AddText(font, kBrandSize, ImVec2(tx, logoCy - 80.0f), kWhite, "Microsoft");
+        dl->AddText(font, kBrandSize, ImVec2(tx, logoCy - 80.0f * scale), kWhite, "Microsoft");
 
-        const ImVec2 namePos(tx, logoCy - 50.0f);
+        const ImVec2 namePos(tx, logoCy - 50.0f * scale);
         dl->AddText(font, kNameSize, namePos, kWhite, "Windows");
-        dl->AddText(font, kNameSize, ImVec2(namePos.x + windowsW + 6.0f, namePos.y),
+        dl->AddText(font, kNameSize, ImVec2(namePos.x + windowsW + 6.0f * scale, namePos.y),
                     kXpOrange, "xp");
 
-        dl->AddText(font, kEditionSize, ImVec2(tx + 4.0f, logoCy + 24.0f),
+        dl->AddText(font, kEditionSize, ImVec2(tx + 4.0f * scale, logoCy + 24.0f * scale),
                     kWhite, "Professional");
 
-        barY = logoCy + 96.0f;
+        barY = logoCy + 96.0f * scale;
     }
 
     // ── 3. Animated progress bar (blue blocks sweeping left to right) ──
@@ -138,14 +145,14 @@ void BootScreen::draw(const ImVec2& view, double elapsedSec,
                       ImVec2(barX + kBarW - 1.0f, barY + kBarH - 1.0f),
                       IM_COL32(0, 0, 0, 255));
 
-    const float ix0 = barX + 2.0f, ix1 = barX + kBarW - 2.0f;
-    const float iy0 = barY + 3.0f, iy1 = barY + kBarH - 3.0f;
+    const float ix0 = barX + 2.0f * scale, ix1 = barX + kBarW - 2.0f * scale;
+    const float iy0 = barY + 3.0f * scale, iy1 = barY + kBarH - 3.0f * scale;
 
-    constexpr float kBlockW = 10.0f, kBlockGap = 5.0f;
+    const float kBlockW = 10.0f * scale, kBlockGap = 5.0f * scale;
     constexpr int kBlocks = 3;
     const float groupW = kBlocks * kBlockW + (kBlocks - 1) * kBlockGap;
     const float travel = (ix1 - ix0) + groupW;
-    const float head = std::fmod(static_cast<float>(elapsedSec) * 130.0f, travel);
+    const float head = std::fmod(static_cast<float>(elapsedSec) * (130.0f * scale), travel);
     const float sx = ix0 - groupW + head;
 
     dl->PushClipRect(ImVec2(ix0, iy0), ImVec2(ix1, iy1), true);
@@ -158,9 +165,9 @@ void BootScreen::draw(const ImVec2& view, double elapsedSec,
     dl->PopClipRect();
 
     // ── 4. Footer: copyright line ──
-    constexpr float kFootSize = 15.0f;
-    const float footY = view.y - 34.0f;
-    dl->AddText(font, kFootSize, ImVec2(24.0f, footY), kBootGray,
+    const float kFootSize = 15.0f * scale;
+    const float footY = view.y - 34.0f * scale;
+    dl->AddText(font, kFootSize, ImVec2(24.0f * scale, footY), kBootGray,
                 "Copyright (c) Microsoft Corporation");
 }
 

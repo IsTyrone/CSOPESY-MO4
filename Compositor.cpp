@@ -64,9 +64,10 @@ bool Compositor::init() {
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr; // keep working folder clean
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.FontGlobalScale = m_config.uiScale;
-
-    applyStyle();
+    m_viewport = ImVec2(static_cast<float>(m_config.framebufferWidth), static_cast<float>(m_config.framebufferHeight));
+    m_effectiveScale = computeEffectiveScale();
+    m_lastAppliedScale = m_effectiveScale;
+    applyStyle(m_effectiveScale);
 
     if (!ImGui_ImplGlfw_InitForOpenGL(m_window, true)) {
         std::fprintf(stderr, "Failed to initialise the ImGui GLFW backend.\n");
@@ -106,8 +107,23 @@ bool Compositor::init() {
     return true;
 }
 
-void Compositor::applyStyle() {
+float Compositor::computeEffectiveScale() const {
+    if (m_viewport.x <= 0.0f || m_viewport.y <= 0.0f) {
+        return m_config.uiScale;
+    }
+    const float ratioW = m_viewport.x / 1280.0f;
+    const float ratioH = m_viewport.y / 800.0f;
+    const float autoRatio = std::min(ratioW, ratioH);
+    const float clampedRatio = std::clamp(autoRatio, 0.75f, 3.5f);
+    return m_config.uiScale * clampedRatio;
+}
+
+void Compositor::applyStyle(float scale) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontGlobalScale = scale;
+
     ImGuiStyle& style = ImGui::GetStyle();
+    style = ImGuiStyle(); // Reset to fresh unscaled defaults
 
     // ── Authentic Windows Classic Metrics (Sharp, square 3D corners) ──
     style.WindowRounding    = 0.0f;
@@ -182,7 +198,7 @@ void Compositor::applyStyle() {
     style.Colors[ImGuiCol_TableRowBg]            = cClientWhite;
     style.Colors[ImGuiCol_TableRowBgAlt]         = ImVec4(0.96f, 0.96f, 0.96f, 1.00f);
 
-    style.ScaleAllSizes(m_config.uiScale);
+    style.ScaleAllSizes(scale);
 }
 
 void Compositor::run() {
@@ -218,13 +234,44 @@ void Compositor::run() {
 
 void Compositor::beginFrame() {
     glfwPollEvents();
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
 
     int w = 0, h = 0;
     glfwGetFramebufferSize(m_window, &w, &h);
     m_viewport = ImVec2(static_cast<float>(w), static_cast<float>(h));
+
+    const float targetScale = computeEffectiveScale();
+    const bool scaleChanged = (std::abs(targetScale - m_effectiveScale) > 0.005f);
+
+    if (scaleChanged || m_lastAppliedScale < 0.0f) {
+        const float oldScale = m_effectiveScale;
+        m_effectiveScale = targetScale;
+        m_lastAppliedScale = targetScale;
+        applyStyle(targetScale);
+
+        ImVec2 curMin, curMax;
+        desktopArea(curMin, curMax);
+        if (m_lastDesktopMax.x > 0.0f && m_lastDesktopMax.y > 0.0f) {
+            const float ratio = (oldScale > 0.0f) ? (targetScale / oldScale) : 1.0f;
+            m_windowManager.onViewportOrScaleChanged(m_lastDesktopMin, m_lastDesktopMax,
+                                                     curMin, curMax, ratio);
+        }
+        m_lastDesktopMin = curMin;
+        m_lastDesktopMax = curMax;
+    } else {
+        ImVec2 curMin, curMax;
+        desktopArea(curMin, curMax);
+        if (curMin.x != m_lastDesktopMin.x || curMin.y != m_lastDesktopMin.y ||
+            curMax.x != m_lastDesktopMax.x || curMax.y != m_lastDesktopMax.y) {
+            m_windowManager.onViewportOrScaleChanged(m_lastDesktopMin, m_lastDesktopMax,
+                                                     curMin, curMax, 1.0f);
+            m_lastDesktopMin = curMin;
+            m_lastDesktopMax = curMax;
+        }
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 
 void Compositor::endFrame() {
@@ -256,7 +303,7 @@ void Compositor::shutdown() {
 }
 
 float Compositor::taskbarHeight() const {
-    return std::max(38.0f * m_config.uiScale, ImGui::GetFontSize() * 2.5f);
+    return std::max(40.0f * m_effectiveScale, ImGui::GetFontSize() * 2.4f);
 }
 
 ImVec2 Compositor::viewportSize() const {

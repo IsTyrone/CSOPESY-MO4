@@ -7,6 +7,7 @@
 #include "Compositor.h"
 #include "RetroGfx.h"
 #include <cstdio>
+#include <algorithm>
 
 namespace {
 
@@ -58,12 +59,15 @@ void FilesApp::drawIcon(ImDrawList* dl, const ImVec2& center, float size) {
 }
 
 void FilesApp::render(Compositor& compositor, bool* keepOpen) {
-    const ImVec2 view = compositor.viewportSize();
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar;
+    if (compositor.windowManager().isAppMaximized(m_id)) {
+        flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+    }
 
-    ImGui::SetNextWindowSize(ImVec2(720.0f, 460.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(view.x * 0.5f - 360.0f, view.y * 0.5f - 230.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Exploring - C:\\CSOPESY", nullptr, flags)) {
+        compositor.windowManager().renderTitleBarButtons(compositor, m_id, keepOpen);
 
-    if (ImGui::Begin("Exploring - C:\\CSOPESY", keepOpen, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar)) {
+        const float scale = compositor.effectiveScale();
 
         // Classic Menu Bar
         if (ImGui::BeginMenuBar()) {
@@ -90,24 +94,27 @@ void FilesApp::render(Compositor& compositor, bool* keepOpen) {
         }
 
         // Classic Address Bar
+        const float goW = 55.0f * scale;
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Address");
         ImGui::SameLine();
         static char addrBuffer[128] = "C:\\CSOPESY\\src";
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 60.0f);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - goW - ImGui::GetStyle().ItemSpacing.x);
         ImGui::InputText("##address", addrBuffer, sizeof(addrBuffer));
         ImGui::SameLine();
-        if (ImGui::Button("Go", ImVec2(50.0f, 0.0f))) {}
+        if (ImGui::Button("Go", ImVec2(goW, 0.0f))) {}
 
         ImGui::Separator();
 
         // Split Panes: Tree on left, Files on right
+        const float sbH = std::max(22.0f * scale, ImGui::GetFontSize() + 8.0f);
         const float availH = ImGui::GetContentRegionAvail().y;
-        const float paneH = std::max(140.0f, availH - 32.0f);
+        const float paneH = std::max(120.0f, availH - sbH - ImGui::GetStyle().ItemSpacing.y * 2.0f);
         const ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg;
 
         if (ImGui::BeginTable("##explorer_panes", 2, tableFlags, ImVec2(0.0f, paneH))) {
-            ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+            const float folderColW = std::clamp(ImGui::GetContentRegionAvail().x * 0.28f, 150.0f * scale, 320.0f * scale);
+            ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, folderColW);
             ImGui::TableSetupColumn("Contents", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableHeadersRow();
 
@@ -138,12 +145,13 @@ void FilesApp::render(Compositor& compositor, bool* keepOpen) {
             const ImGuiTableFlags fileTableFlags =
                 ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 
-            if (ImGui::BeginTable("##file_list", 4, fileTableFlags, ImVec2(0.0f, paneH - 24.0f))) {
+            const float fileListH = std::max(80.0f, paneH - ImGui::GetFrameHeightWithSpacing());
+            if (ImGui::BeginTable("##file_list", 4, fileTableFlags, ImVec2(0.0f, fileListH))) {
                 ImGui::TableSetupScrollFreeze(0, 1);
                 ImGui::TableSetupColumn("Name",     ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("Size",     ImGuiTableColumnFlags_WidthFixed, 65.0f);
-                ImGui::TableSetupColumn("Type",     ImGuiTableColumnFlags_WidthFixed, 100.0f);
-                ImGui::TableSetupColumn("Modified", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                ImGui::TableSetupColumn("Size",     ImGuiTableColumnFlags_WidthFixed, 75.0f * scale);
+                ImGui::TableSetupColumn("Type",     ImGuiTableColumnFlags_WidthFixed, 115.0f * scale);
+                ImGui::TableSetupColumn("Modified", ImGuiTableColumnFlags_WidthFixed, 105.0f * scale);
                 ImGui::TableHeadersRow();
 
                 for (const auto& f : kExplorerFiles) {
@@ -174,19 +182,19 @@ void FilesApp::render(Compositor& compositor, bool* keepOpen) {
 
         // Status Bar
         ImGui::Separator();
-        const float sbH = 22.0f;
         const ImVec2 sbPos = ImGui::GetCursorScreenPos();
         const float availW = ImGui::GetContentRegionAvail().x;
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        RetroGfx::drawSunkenBorder(dl, sbPos, ImVec2(sbPos.x + availW * 0.6f, sbPos.y + sbH), RetroGfx::kGrayFace);
-        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + availW * 0.6f + 6.0f, sbPos.y), ImVec2(sbPos.x + availW, sbPos.y + sbH), RetroGfx::kGrayFace);
+        const float panel1W = availW * 0.65f;
+        RetroGfx::drawSunkenBorder(dl, sbPos, ImVec2(sbPos.x + panel1W, sbPos.y + sbH), RetroGfx::kGrayFace);
+        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + panel1W + 4.0f * scale, sbPos.y), ImVec2(sbPos.x + availW, sbPos.y + sbH), RetroGfx::kGrayFace);
 
         const float ty = sbPos.y + (sbH - ImGui::GetFontSize()) * 0.5f;
-        dl->AddText(ImVec2(sbPos.x + 8.0f, ty), RetroGfx::kBlack, "26 object(s)  (Disk free space: 248 MB)");
-        dl->AddText(ImVec2(sbPos.x + availW * 0.6f + 14.0f, ty), RetroGfx::kBlack, "My Computer");
+        dl->AddText(ImVec2(sbPos.x + 8.0f * scale, ty), RetroGfx::kBlack, "26 object(s)  (Disk free space: 248 MB)");
+        dl->AddText(ImVec2(sbPos.x + panel1W + 10.0f * scale, ty), RetroGfx::kBlack, "My Computer");
 
-        ImGui::Dummy(ImVec2(0.0f, sbH + 2.0f));
+        ImGui::Dummy(ImVec2(0.0f, sbH));
     }
     ImGui::End();
 }
@@ -200,13 +208,15 @@ void SettingsApp::drawIcon(ImDrawList* dl, const ImVec2& center, float size) {
 }
 
 void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
-    const ImVec2 view = compositor.viewportSize();
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    if (compositor.windowManager().isAppMaximized(m_id)) {
+        flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+    }
 
-    ImGui::SetNextWindowSize(ImVec2(560.0f, 480.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(view.x * 0.5f - 280.0f, view.y * 0.5f - 240.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Control Panel - System Settings", nullptr, flags)) {
+        compositor.windowManager().renderTitleBarButtons(compositor, m_id, keepOpen);
 
-    if (ImGui::Begin("Control Panel - System Settings", keepOpen, ImGuiWindowFlags_NoCollapse)) {
-
+        const float scale = compositor.effectiveScale();
         Config& cfg = const_cast<Config&>(compositor.config());
 
         if (ImGui::BeginTabBar("##SettingsTabs", ImGuiTabBarFlags_None)) {
@@ -246,7 +256,7 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                 // Color Preview Box
                 ImGui::Text("Preview:");
                 const ImVec2 prevPos = ImGui::GetCursorScreenPos();
-                const ImVec2 prevSize(ImGui::GetContentRegionAvail().x, 80.0f);
+                const ImVec2 prevSize(ImGui::GetContentRegionAvail().x, 80.0f * scale);
                 ImDrawList* dl = ImGui::GetWindowDrawList();
                 const ImU32 previewCol =
                     (wpIndex == 0) ? RetroGfx::kTealDesktop :
@@ -282,8 +292,10 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Text("Icon & Interface Scale (Fix for small icons)");
-                ImGui::SliderFloat("UI Scale Factor", &cfg.uiScale, 1.0f, 2.0f, "%.2fx");
-                ImGui::TextDisabled("Note: Adjusting scale updates icon sizing and font proportions.");
+                if (ImGui::SliderFloat("UI Scale Factor", &cfg.uiScale, 1.0f, 2.5f, "%.2fx")) {
+                    compositor.onConfigChanged();
+                }
+                ImGui::TextDisabled("Note: Adjusting scale updates icons, text, and window metrics dynamically.");
                 ImGui::EndTabItem();
             }
 
@@ -313,9 +325,13 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
                 ImGui::Spacing();
                 ImGui::Text("Active Runtime Parameters (Loaded from config.txt):");
                 ImGui::Separator();
-                for (const std::string& line : cfg.dump()) {
-                    ImGui::TextUnformatted(line.c_str());
+                const float childH = std::max(100.0f, ImGui::GetContentRegionAvail().y - 12.0f);
+                if (ImGui::BeginChild("##ConfigDumpChild", ImVec2(0.0f, childH), true)) {
+                    for (const std::string& line : cfg.dump()) {
+                        ImGui::TextUnformatted(line.c_str());
+                    }
                 }
+                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
 
@@ -325,20 +341,21 @@ void SettingsApp::render(Compositor& compositor, bool* keepOpen) {
         // Bottom Dialog Action Buttons
         ImGui::Spacing();
         ImGui::Separator();
-        const float btnW = 90.0f;
-        const float rightAlignX = ImGui::GetContentRegionAvail().x - (btnW * 3.0f + 16.0f);
-        if (rightAlignX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + rightAlignX);
+        const float btnW = 90.0f * scale;
+        const float btnH = std::max(26.0f * scale, ImGui::GetFontSize() + 8.0f);
+        const float rightAlignX = ImGui::GetContentRegionAvail().x - (btnW * 3.0f + 16.0f * scale);
+        if (rightAlignX > 0.0f) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + rightAlignX);
 
-        if (ImGui::Button("OK", ImVec2(btnW, 26.0f))) {
+        if (ImGui::Button("OK", ImVec2(btnW, btnH))) {
             *keepOpen = false;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(btnW, 26.0f))) {
+        if (ImGui::Button("Cancel", ImVec2(btnW, btnH))) {
             *keepOpen = false;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Apply", ImVec2(btnW, 26.0f))) {
-            // Apply instantly
+        if (ImGui::Button("Apply", ImVec2(btnW, btnH))) {
+            compositor.onConfigChanged();
         }
     }
     ImGui::End();
