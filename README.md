@@ -313,7 +313,7 @@ CSOPESY-MO4/
 - **Institution**: De La Salle University
 - **Entry File**: `main.cpp`
 - **Group Members**:
-  - `[Member 1 Name]` - `[ID Number]`
-  - `[Member 2 Name]` - `[ID Number]`
-  - `[Member 3 Name]` - `[ID Number]`
-  - `[Member 4 Name]` - `[ID Number]`
+  - `Carlo Gabriel Barreo`
+  - `Gaibril Kyle Gregorio`
+  - `David Lorenz Javier`
+  - `Tyrone Julius Lee`
