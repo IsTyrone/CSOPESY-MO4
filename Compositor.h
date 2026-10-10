@@ -55,6 +55,7 @@ public:
     static const char* appFiles()       { return "files"; }
     static const char* appSettings()    { return "settings"; }
     static const char* appTaskManager() { return "taskmanager"; }
+    static const char* appCalculator()  { return "calculator"; }
 
 private:
     float computeEffectiveScale() const;

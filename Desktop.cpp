@@ -166,7 +166,7 @@ void Desktop::draw(Compositor& compositor, const ImVec2& areaMin, const ImVec2& 
         const float boxW = 86.0f * uiScale;
         const float iconGraphicSize = 44.0f * uiScale;
         const float shortcutsW = boxW + 24.0f * uiScale;
-        const float shortcutsH = (boxW + 36.0f * uiScale) * 3.5f;
+        const float shortcutsH = (boxW + 36.0f * uiScale) * 4.5f;
 
         const ImGuiWindowFlags scFlags =
             ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
@@ -183,6 +183,7 @@ void Desktop::draw(Compositor& compositor, const ImVec2& areaMin, const ImVec2& 
         drawDesktopShortcut("Files", "files", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawFolderIcon);
         drawDesktopShortcut("Settings", "settings", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawSettingsIcon);
         drawDesktopShortcut("Task Manager", "taskmanager", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawTaskManagerIcon);
+        drawDesktopShortcut("Calculator", "calculator", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawCalculatorIcon);
 
         ImGui::End();
     }

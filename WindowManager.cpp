@@ -336,6 +336,9 @@ void WindowManager::renderWindows(Compositor& compositor) {
                 } else if (entry.app->id() == "settings") {
                     defSize = ImVec2(std::min(600.0f * scale, desktopW * 0.85f),
                                      std::min(520.0f * scale, desktopH * 0.85f));
+                } else if (entry.app->id() == "calculator") {
+                    defSize = ImVec2(std::min(260.0f * scale, desktopW * 0.50f),
+                                     std::min(340.0f * scale, desktopH * 0.65f));
                 } else {
                     defSize = ImVec2(std::min(700.0f * scale, desktopW * 0.88f),
                                      std::min(520.0f * scale, desktopH * 0.85f));

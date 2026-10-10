@@ -57,7 +57,7 @@ void drawStartMenu(Compositor& compositor, const ImVec2& barOrigin, float barH) 
 
     const float uiScale = compositor.effectiveScale();
     const float menuW = 210.0f * uiScale;
-    const float menuH = 240.0f * uiScale;
+    const float menuH = 280.0f * uiScale;
     const bool barAtTop = compositor.config().taskbarAtTop;
 
     const ImVec2 menuPos = barAtTop ? ImVec2(barOrigin.x, barOrigin.y + barH)
@@ -124,6 +124,7 @@ void drawStartMenu(Compositor& compositor, const ImVec2& barOrigin, float barH) 
     renderMenuItem("Files (Explorer)", "files", RetroGfx::drawFolderIcon);
     renderMenuItem("Settings", "settings", RetroGfx::drawSettingsIcon);
     renderMenuItem("Task Manager", "taskmanager", RetroGfx::drawTaskManagerIcon);
+    renderMenuItem("Calculator", "calculator", RetroGfx::drawCalculatorIcon);
 
     // Separator line
     itemY += 4.0f * uiScale;
@@ -245,6 +246,9 @@ void TaskBar::draw(Compositor& compositor) {
     }
     if (drawTaskBarLauncher("##qlTaskMgr", "Task Manager", "taskmanager", compositor, cursor, qIconSize, graphicSize, RetroGfx::drawTaskManagerIcon)) {
         compositor.windowManager().toggleApp("taskmanager");
+    }
+    if (drawTaskBarLauncher("##qlCalc", "Calculator", "calculator", compositor, cursor, qIconSize, graphicSize, RetroGfx::drawCalculatorIcon)) {
+        compositor.windowManager().toggleApp("calculator");
     }
 
     // Divider after Quick Launch

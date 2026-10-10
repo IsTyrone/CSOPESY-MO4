@@ -48,6 +48,9 @@ void drawTaskManagerIcon(ImDrawList* dl, const ImVec2& center, float size);
 // Red Shut Down / Power icon
 void drawPowerIcon(ImDrawList* dl, const ImVec2& center, float size);
 
+// Classic Calculator Accessory icon
+void drawCalculatorIcon(ImDrawList* dl, const ImVec2& center, float size);
+
 // System Tray: Audio Speaker
 void drawSpeakerIcon(ImDrawList* dl, const ImVec2& center, float size);
 

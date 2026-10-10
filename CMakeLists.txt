@@ -37,6 +37,7 @@ set(APP_SOURCES
     TaskBar.cpp
     TaskManager.cpp
     AppScreen.cpp
+    CalculatorApp.cpp
     ProcessSimulator.cpp
     Config.cpp
     RetroGfx.cpp
