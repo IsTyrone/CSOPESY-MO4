@@ -9,6 +9,7 @@
 #include "TaskManager.h"
 #include "AppScreen.h"
 #include "RetroGfx.h"
+#include "BootScreen.h"
 
 #include <cstdio>
 #include <algorithm>
@@ -63,9 +64,10 @@ bool Compositor::init() {
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr; // keep working folder clean
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.FontGlobalScale = m_config.uiScale;
-
-    applyStyle();
+    m_viewport = ImVec2(static_cast<float>(m_config.framebufferWidth), static_cast<float>(m_config.framebufferHeight));
+    m_effectiveScale = computeEffectiveScale();
+    m_lastAppliedScale = m_effectiveScale;
+    applyStyle(m_effectiveScale);
 
     if (!ImGui_ImplGlfw_InitForOpenGL(m_window, true)) {
         std::fprintf(stderr, "Failed to initialise the ImGui GLFW backend.\n");
@@ -84,6 +86,14 @@ bool Compositor::init() {
         return false;
     }
 
+    // ── Load wallpaper image texture if configured ──
+    if (m_config.wallpaperMode == "image") {
+        m_wallpaperTexture.loadFromFile(m_config.wallpaperImage);
+    }
+
+    // ── Load the boot splash center logo (vector fallback is used if missing) ──
+    m_bootLogo.loadFromFile("assets/windows xp logo.png");
+
     // ── Register Application Modules via Polymorphic WindowManager ──
     m_windowManager.registerApp(std::make_shared<FilesApp>());
     m_windowManager.registerApp(std::make_shared<SettingsApp>());
@@ -97,8 +107,23 @@ bool Compositor::init() {
     return true;
 }
 
-void Compositor::applyStyle() {
+float Compositor::computeEffectiveScale() const {
+    if (m_viewport.x <= 0.0f || m_viewport.y <= 0.0f) {
+        return m_config.uiScale;
+    }
+    const float ratioW = m_viewport.x / 1280.0f;
+    const float ratioH = m_viewport.y / 800.0f;
+    const float autoRatio = std::min(ratioW, ratioH);
+    const float clampedRatio = std::clamp(autoRatio, 0.75f, 3.5f);
+    return m_config.uiScale * clampedRatio;
+}
+
+void Compositor::applyStyle(float scale) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontGlobalScale = scale;
+
     ImGuiStyle& style = ImGui::GetStyle();
+    style = ImGuiStyle(); // Reset to fresh unscaled defaults
 
     // ── Authentic Windows Classic Metrics (Sharp, square 3D corners) ──
     style.WindowRounding    = 0.0f;
@@ -173,14 +198,28 @@ void Compositor::applyStyle() {
     style.Colors[ImGuiCol_TableRowBg]            = cClientWhite;
     style.Colors[ImGuiCol_TableRowBgAlt]         = ImVec4(0.96f, 0.96f, 0.96f, 1.00f);
 
-    style.ScaleAllSizes(m_config.uiScale);
+    style.ScaleAllSizes(scale);
 }
 
 void Compositor::run() {
+    m_bootStart = glfwGetTime();
+    m_bootDone = false;
+
     while (!m_shutdownRequested && !glfwWindowShouldClose(m_window)) {
         const double now = glfwGetTime();
         const double delta = now - m_lastTime;
         m_lastTime = now;
+
+        // ── Boot splash phase: Windows XP loading screen (skippable) ──
+        if (!m_bootDone) {
+            beginFrame();
+            drawBootLayer(now);
+            if ((now - m_bootStart) >= BootScreen::kDurationSec || BootScreen::skipRequested()) {
+                m_bootDone = true;
+            }
+            endFrame();
+            continue;
+        }
 
         m_simulator.update(delta);
 
@@ -195,20 +234,55 @@ void Compositor::run() {
 
 void Compositor::beginFrame() {
     glfwPollEvents();
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
 
     int w = 0, h = 0;
     glfwGetFramebufferSize(m_window, &w, &h);
     m_viewport = ImVec2(static_cast<float>(w), static_cast<float>(h));
+
+    const float targetScale = computeEffectiveScale();
+    const bool scaleChanged = (std::abs(targetScale - m_effectiveScale) > 0.005f);
+
+    if (scaleChanged || m_lastAppliedScale < 0.0f) {
+        const float oldScale = m_effectiveScale;
+        m_effectiveScale = targetScale;
+        m_lastAppliedScale = targetScale;
+        applyStyle(targetScale);
+
+        ImVec2 curMin, curMax;
+        desktopArea(curMin, curMax);
+        if (m_lastDesktopMax.x > 0.0f && m_lastDesktopMax.y > 0.0f) {
+            const float ratio = (oldScale > 0.0f) ? (targetScale / oldScale) : 1.0f;
+            m_windowManager.onViewportOrScaleChanged(m_lastDesktopMin, m_lastDesktopMax,
+                                                     curMin, curMax, ratio);
+        }
+        m_lastDesktopMin = curMin;
+        m_lastDesktopMax = curMax;
+    } else {
+        ImVec2 curMin, curMax;
+        desktopArea(curMin, curMax);
+        if (curMin.x != m_lastDesktopMin.x || curMin.y != m_lastDesktopMin.y ||
+            curMax.x != m_lastDesktopMax.x || curMax.y != m_lastDesktopMax.y) {
+            m_windowManager.onViewportOrScaleChanged(m_lastDesktopMin, m_lastDesktopMax,
+                                                     curMin, curMax, 1.0f);
+            m_lastDesktopMin = curMin;
+            m_lastDesktopMax = curMax;
+        }
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 
 void Compositor::endFrame() {
     ImGui::Render();
 
     glViewport(0, 0, static_cast<int>(m_viewport.x), static_cast<int>(m_viewport.y));
-    glClearColor(0.0f, 0.502f, 0.502f, 1.0f); // Default #008080 teal clear
+    if (m_bootDone) {
+        glClearColor(0.0f, 0.502f, 0.502f, 1.0f); // Default #008080 teal clear
+    } else {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Pure black behind the XP boot splash
+    }
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -216,6 +290,8 @@ void Compositor::endFrame() {
 }
 
 void Compositor::shutdown() {
+    m_bootLogo.release();
+    m_wallpaperTexture.release();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -227,7 +303,7 @@ void Compositor::shutdown() {
 }
 
 float Compositor::taskbarHeight() const {
-    return std::max(38.0f * m_config.uiScale, ImGui::GetFontSize() * 2.5f);
+    return std::max(40.0f * m_effectiveScale, ImGui::GetFontSize() * 2.4f);
 }
 
 ImVec2 Compositor::viewportSize() const {
@@ -243,6 +319,12 @@ void Compositor::desktopArea(ImVec2& outMin, ImVec2& outMax) const {
         outMin = ImVec2(0.0f, 0.0f);
         outMax = ImVec2(m_viewport.x, m_viewport.y - bar);
     }
+}
+
+void Compositor::drawBootLayer(double now) {
+    const WallpaperTexture& logo = m_bootLogo;
+    BootScreen::draw(m_viewport, now - m_bootStart,
+                     logo.handle(), logo.width(), logo.height());
 }
 
 void Compositor::drawDesktopLayer() {

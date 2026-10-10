@@ -19,7 +19,8 @@ struct Config {
     int         updateIntervalMs  = 180;
     unsigned    rngSeed           = 20260918u;
     bool        taskbarAtTop      = false;          // false = classic bottom taskbar, true = top
-    std::string wallpaperMode     = "classic-teal"; // classic-teal | gradient | bliss | pattern | plain
+    std::string wallpaperMode     = "classic-teal"; // classic-teal | gradient | bliss | pattern | plain | image
+    std::string wallpaperImage    = "assets/wallpapers/bliss-classic.jpg"; // used when wallpaperMode == "image"
     float       uiScale           = 1.25f;          // Scale factor to ensure crisp, readable icons
     bool        showDesktopIcons  = true;           // Windows 95/98 desktop shortcuts
     std::string theme             = "classic";      // classic | modern

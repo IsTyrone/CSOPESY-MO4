@@ -255,4 +255,46 @@ void drawNetworkIcon(ImDrawList* dl, const ImVec2& center, float size) {
                       IM_COL32(0, 200, 100, 255));
 }
 
+void drawMinimizeIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, float scale) {
+    const float pad = 3.0f * scale;
+    const float y = max.y - pad - 1.5f * scale;
+    dl->AddLine(ImVec2(min.x + pad, y), ImVec2(max.x - pad, y), kBlack, std::max(2.0f, 2.0f * scale));
+}
+
+void drawMaximizeIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, bool isMaximized, float scale) {
+    if (!isMaximized) {
+        // Classic single square with thick 2-pixel header bar
+        const float pad = 3.0f * scale;
+        const ImVec2 bMin(min.x + pad, min.y + pad);
+        const ImVec2 bMax(max.x - pad, max.y - pad);
+        dl->AddRect(bMin, bMax, kBlack, 0.0f, 0, 1.0f);
+        dl->AddLine(ImVec2(bMin.x, bMin.y + 1.0f * scale), ImVec2(bMax.x, bMin.y + 1.0f * scale),
+                    kBlack, std::max(2.0f, 2.0f * scale));
+    } else {
+        // Classic restore icon: two overlapping squares
+        const float pad = 2.5f * scale;
+        const float off = 3.0f * scale;
+        // Back square
+        const ImVec2 b1Min(min.x + pad + off, min.y + pad);
+        const ImVec2 b1Max(max.x - pad, max.y - pad - off);
+        dl->AddRect(b1Min, b1Max, kBlack, 0.0f, 0, 1.0f);
+        dl->AddLine(ImVec2(b1Min.x, b1Min.y + 1.0f * scale), ImVec2(b1Max.x, b1Min.y + 1.0f * scale),
+                    kBlack, std::max(1.8f, 1.8f * scale));
+        // Front square (fills over back square)
+        const ImVec2 b2Min(min.x + pad, min.y + pad + off);
+        const ImVec2 b2Max(max.x - pad - off, max.y - pad);
+        dl->AddRectFilled(b2Min, b2Max, kGrayFace);
+        dl->AddRect(b2Min, b2Max, kBlack, 0.0f, 0, 1.0f);
+        dl->AddLine(ImVec2(b2Min.x, b2Min.y + 1.0f * scale), ImVec2(b2Max.x, b2Min.y + 1.0f * scale),
+                    kBlack, std::max(1.8f, 1.8f * scale));
+    }
+}
+
+void drawCloseIcon(ImDrawList* dl, const ImVec2& min, const ImVec2& max, float scale) {
+    const float pad = 3.5f * scale;
+    const float thickness = std::max(1.5f, 1.5f * scale);
+    dl->AddLine(ImVec2(min.x + pad, min.y + pad), ImVec2(max.x - pad, max.y - pad), kBlack, thickness);
+    dl->AddLine(ImVec2(max.x - pad, min.y + pad), ImVec2(min.x + pad, max.y - pad), kBlack, thickness);
+}
+
 } // namespace RetroGfx
