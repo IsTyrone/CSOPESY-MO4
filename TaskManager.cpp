@@ -31,10 +31,10 @@ void TaskManagerApp::drawIcon(ImDrawList* dl, const ImVec2& center, float size) 
 }
 
 void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
-    const ImVec2 view = compositor.viewportSize();
-
-    ImGui::SetNextWindowSize(ImVec2(680.0f, 480.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(view.x * 0.5f - 340.0f, view.y * 0.5f - 240.0f), ImGuiCond_FirstUseEver);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    if (compositor.windowManager().isAppMaximized(m_id)) {
+        flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+    }
 
     // Update CPU history
     const ProcessSimulator& sim = compositor.simulator();
@@ -46,7 +46,10 @@ void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
         m_cpuHistory.push_back(currentCpu);
     }
 
-    if (ImGui::Begin("Windows Task Manager", keepOpen, ImGuiWindowFlags_NoCollapse)) {
+    if (ImGui::Begin("Windows Task Manager", nullptr, flags)) {
+        compositor.windowManager().renderTitleBarButtons(compositor, m_id, keepOpen);
+
+        const float scale = compositor.effectiveScale();
 
         // Classic Menu Bar / Tabs
         if (ImGui::BeginTabBar("##TaskMgrTabs", ImGuiTabBarFlags_None)) {
@@ -70,7 +73,7 @@ void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
 
         // Sunken Status Bar at Bottom
         ImGui::Separator();
-        const float sbH = 22.0f;
+        const float sbH = std::max(22.0f * scale, ImGui::GetFontSize() + 8.0f);
         const ImVec2 sbPos = ImGui::GetCursorScreenPos();
         const float availW = ImGui::GetContentRegionAvail().x;
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -80,36 +83,39 @@ void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
         std::snprintf(sb2, sizeof(sb2), "CPU Usage: %.1f%%", static_cast<double>(currentCpu));
         std::snprintf(sb3, sizeof(sb3), "Mem: %dMB / %dMB", sim.usedMemoryKb() / 1024, sim.totalMemoryKb() / 1024);
 
-        const float partW = (availW - 12.0f) / 3.0f;
+        const float gap = 4.0f * scale;
+        const float partW = (availW - gap * 2.0f) / 3.0f;
         RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x, sbPos.y), ImVec2(sbPos.x + partW, sbPos.y + sbH), RetroGfx::kGrayFace);
-        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + partW + 6.0f, sbPos.y), ImVec2(sbPos.x + partW * 2.0f + 6.0f, sbPos.y + sbH), RetroGfx::kGrayFace);
-        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + (partW + 6.0f) * 2.0f, sbPos.y), ImVec2(sbPos.x + availW, sbPos.y + sbH), RetroGfx::kGrayFace);
+        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + partW + gap, sbPos.y), ImVec2(sbPos.x + partW * 2.0f + gap, sbPos.y + sbH), RetroGfx::kGrayFace);
+        RetroGfx::drawSunkenBorder(dl, ImVec2(sbPos.x + (partW + gap) * 2.0f, sbPos.y), ImVec2(sbPos.x + availW, sbPos.y + sbH), RetroGfx::kGrayFace);
 
         const float ty = sbPos.y + (sbH - ImGui::GetFontSize()) * 0.5f;
-        dl->AddText(ImVec2(sbPos.x + 8.0f, ty), RetroGfx::kBlack, sb1);
-        dl->AddText(ImVec2(sbPos.x + partW + 14.0f, ty), RetroGfx::kBlack, sb2);
-        dl->AddText(ImVec2(sbPos.x + (partW + 6.0f) * 2.0f + 8.0f, ty), RetroGfx::kBlack, sb3);
+        dl->AddText(ImVec2(sbPos.x + 8.0f * scale, ty), RetroGfx::kBlack, sb1);
+        dl->AddText(ImVec2(sbPos.x + partW + 12.0f * scale, ty), RetroGfx::kBlack, sb2);
+        dl->AddText(ImVec2(sbPos.x + (partW + gap) * 2.0f + 8.0f * scale, ty), RetroGfx::kBlack, sb3);
 
-        ImGui::Dummy(ImVec2(0.0f, sbH + 2.0f));
+        ImGui::Dummy(ImVec2(0.0f, sbH));
     }
     ImGui::End();
 }
 
 void TaskManagerApp::renderProcessesTab(Compositor& compositor) {
     const ProcessSimulator& sim = compositor.simulator();
+    const float scale = compositor.effectiveScale();
 
     const ImGuiTableFlags flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
         ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 
-    const float tableHeight = ImGui::GetContentRegionAvail().y - 42.0f;
+    const float btnH = std::max(26.0f * scale, ImGui::GetFontSize() + 8.0f);
+    const float tableHeight = std::max(100.0f, ImGui::GetContentRegionAvail().y - btnH - ImGui::GetStyle().ItemSpacing.y * 3.0f);
     if (ImGui::BeginTable("##proc_table", 5, flags, ImVec2(0.0f, tableHeight))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Image Name", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("PID",        ImGuiTableColumnFlags_WidthFixed, 65.0f);
-        ImGui::TableSetupColumn("CPU",        ImGuiTableColumnFlags_WidthFixed, 75.0f);
-        ImGui::TableSetupColumn("Mem Usage",  ImGuiTableColumnFlags_WidthFixed, 100.0f);
-        ImGui::TableSetupColumn("Status",     ImGuiTableColumnFlags_WidthFixed, 95.0f);
+        ImGui::TableSetupColumn("PID",        ImGuiTableColumnFlags_WidthFixed, 70.0f * scale);
+        ImGui::TableSetupColumn("CPU",        ImGuiTableColumnFlags_WidthFixed, 80.0f * scale);
+        ImGui::TableSetupColumn("Mem Usage",  ImGuiTableColumnFlags_WidthFixed, 110.0f * scale);
+        ImGui::TableSetupColumn("Status",     ImGuiTableColumnFlags_WidthFixed, 105.0f * scale);
         ImGui::TableHeadersRow();
 
         for (const Process& p : sim.processes()) {
@@ -134,7 +140,7 @@ void TaskManagerApp::renderProcessesTab(Compositor& compositor) {
     }
 
     ImGui::Spacing();
-    if (ImGui::Button("End Process", ImVec2(110.0f, 26.0f))) {
+    if (ImGui::Button("End Process", ImVec2(120.0f * scale, btnH))) {
         // Safe UI feedback
     }
     ImGui::SameLine();
@@ -143,21 +149,23 @@ void TaskManagerApp::renderProcessesTab(Compositor& compositor) {
 
 void TaskManagerApp::renderPerformanceTab(Compositor& compositor) {
     const ProcessSimulator& sim = compositor.simulator();
+    const float scale = compositor.effectiveScale();
     const float currentCpu = sim.totalCpuPercent();
     const int usedMb = sim.usedMemoryKb() / 1024;
     const int totalMb = sim.totalMemoryKb() / 1024;
 
     const float availW = ImGui::GetContentRegionAvail().x;
-    const float availH = ImGui::GetContentRegionAvail().y - 36.0f;
+    const float availH = ImGui::GetContentRegionAvail().y;
 
     // CPU Usage History Box
     ImGui::Text("CPU Usage History (%.1f%%)", static_cast<double>(currentCpu));
     const ImVec2 graphPos = ImGui::GetCursorScreenPos();
-    const ImVec2 graphSize(availW, std::min(160.0f, availH * 0.55f));
+    const float graphH = std::clamp(availH * 0.45f, 130.0f * scale, 300.0f * scale);
+    const ImVec2 graphSize(availW, graphH);
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     RetroGfx::drawSunkenBorder(dl, graphPos, ImVec2(graphPos.x + graphSize.x, graphPos.y + graphSize.y),
-                              IM_COL32(0, 24, 8, 255));
+                               IM_COL32(0, 24, 8, 255));
 
     // Green CRT Grid lines
     const float stepX = graphSize.x / 10.0f;
@@ -181,7 +189,7 @@ void TaskManagerApp::renderPerformanceTab(Compositor& compositor) {
             const float y1 = graphPos.y + graphSize.y - (m_cpuHistory[i + 1] / 100.0f) * (graphSize.y - 6.0f) - 3.0f;
             dl->AddLine(ImVec2(graphPos.x + dx * i, y0),
                         ImVec2(graphPos.x + dx * (i + 1), y1),
-                        IM_COL32(0, 255, 70, 255), 2.0f);
+                        IM_COL32(0, 255, 70, 255), std::max(1.5f, 1.8f * scale));
         }
     }
 
@@ -191,7 +199,7 @@ void TaskManagerApp::renderPerformanceTab(Compositor& compositor) {
     // Memory Usage Bar
     ImGui::Text("MEM Usage History (%d MB of %d MB)", usedMb, totalMb);
     const float memFrac = static_cast<float>(sim.usedMemoryKb()) / static_cast<float>(sim.totalMemoryKb());
-    ImGui::ProgressBar(memFrac, ImVec2(availW, 24.0f));
+    ImGui::ProgressBar(memFrac, ImVec2(availW, std::max(24.0f * scale, ImGui::GetFontSize() + 8.0f)));
 
     ImGui::Spacing();
     ImGui::Columns(2, "##perf_stats", false);
@@ -208,15 +216,18 @@ void TaskManagerApp::renderPerformanceTab(Compositor& compositor) {
 }
 
 void TaskManagerApp::renderApplicationsTab(Compositor& compositor) {
+    const float scale = compositor.effectiveScale();
     ImGui::Text("Running Applications:");
     const ImGuiTableFlags flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 
-    const float tableHeight = ImGui::GetContentRegionAvail().y - 42.0f;
+    const float btnH = std::max(26.0f * scale, ImGui::GetFontSize() + 8.0f);
+    const float btnW = 105.0f * scale;
+    const float tableHeight = std::max(100.0f, ImGui::GetContentRegionAvail().y - btnH - ImGui::GetStyle().ItemSpacing.y * 3.0f);
     if (ImGui::BeginTable("##app_table", 2, flags, ImVec2(0.0f, tableHeight))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Task", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 120.0f * scale);
         ImGui::TableHeadersRow();
 
         for (const std::string& title : compositor.windowManager().openAppTitles()) {
@@ -231,9 +242,9 @@ void TaskManagerApp::renderApplicationsTab(Compositor& compositor) {
     }
 
     ImGui::Spacing();
-    if (ImGui::Button("Switch To", ImVec2(100.0f, 26.0f))) {}
+    if (ImGui::Button("Switch To", ImVec2(btnW, btnH))) {}
     ImGui::SameLine();
-    if (ImGui::Button("New Task...", ImVec2(100.0f, 26.0f))) {}
+    if (ImGui::Button("New Task...", ImVec2(btnW, btnH))) {}
     ImGui::SameLine();
-    if (ImGui::Button("End Task", ImVec2(100.0f, 26.0f))) {}
+    if (ImGui::Button("End Task", ImVec2(btnW, btnH))) {}
 }

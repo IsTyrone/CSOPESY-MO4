@@ -11,7 +11,8 @@
 
 namespace {
 
-void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) {
+void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode,
+                   ImTextureID imageTex, int imgW, int imgH) {
     if (mode == "classic-teal" || mode.empty()) {
         // Authentic Windows 95/98 Teal: #008080
         dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, RetroGfx::kTealDesktop);
@@ -34,6 +35,29 @@ void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) 
         for (float y = 0.0f; y < view.y; y += 4.0f) {
             dl->AddLine(ImVec2(0.0f, y), ImVec2(view.x, y), IM_COL32(0, 0, 0, 18), 1.0f);
         }
+        } else if (mode == "image" && imageTex != 0 && imgW > 0 && imgH > 0) {
+        // "Cover" fit: scale image to fill the whole view, cropping overflow.
+        const float viewAspect = view.x / view.y;
+        const float imgAspect  = static_cast<float>(imgW) / static_cast<float>(imgH);
+
+        float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
+        if (imgAspect > viewAspect) {
+            // Image is wider than view -> crop left/right
+            const float visibleFrac = viewAspect / imgAspect;
+            const float trim = (1.0f - visibleFrac) * 0.5f;
+            u0 = trim; u1 = 1.0f - trim;
+        } else {
+            // Image is taller than view -> crop top/bottom
+            const float visibleFrac = imgAspect / viewAspect;
+            const float trim = (1.0f - visibleFrac) * 0.5f;
+            v0 = trim; v1 = 1.0f - trim;
+        }
+
+        dl->AddImage(imageTex, ImVec2(0.0f, 0.0f), view,
+                     ImVec2(u0, v0), ImVec2(u1, v1));
+    } else if (mode == "image") {
+        // Image mode requested but texture failed to load — safe fallback
+        dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(16, 32, 48, 255));
     } else {
         // Plain dark charcoal
         dl->AddRectFilled(ImVec2(0.0f, 0.0f), view, IM_COL32(24, 28, 36, 255));
@@ -41,7 +65,8 @@ void drawWallpaper(ImDrawList* dl, const ImVec2& view, const std::string& mode) 
 }
 
 // Draw desktop clock directly on background draw list so it never steals mouse input
-void drawDesktopClock(ImDrawList* dl, const ImVec2& areaMin, const ImVec2& areaMax) {
+void drawDesktopClock(ImDrawList* dl, Compositor& compositor, const ImVec2& areaMin, const ImVec2& areaMax) {
+    const float scale = compositor.effectiveScale();
     const std::time_t now = std::time(nullptr);
     std::tm local {};
     localtime_s(&local, &now);
@@ -53,35 +78,41 @@ void drawDesktopClock(ImDrawList* dl, const ImVec2& areaMin, const ImVec2& areaM
     char dateStr[48];
     std::strftime(dateStr, sizeof(dateStr), "%A, %B %d, %Y", &local);
 
-    const float clockX = areaMax.x - 270.0f;
-    const float clockY = areaMin.y + 20.0f;
+    const float clockW = 270.0f * scale;
+    const float clockH = 70.0f * scale;
+    const float clockX = areaMax.x - clockW - 20.0f * scale;
+    const float clockY = areaMin.y + 20.0f * scale;
     const ImVec2 clockMin(clockX, clockY);
-    const ImVec2 clockMax(areaMax.x - 20.0f, clockY + 68.0f);
+    const ImVec2 clockMax(clockX + clockW, clockY + clockH);
 
     // Beveled frame for desktop clock widget
     RetroGfx::draw3DBox(dl, clockMin, clockMax, false, RetroGfx::kGrayFace);
 
     // Sunken inner display screen (LCD/LED feel)
-    const ImVec2 lcdMin(clockMin.x + 4.0f, clockMin.y + 4.0f);
-    const ImVec2 lcdMax(clockMax.x - 4.0f, clockMax.y - 4.0f);
+    const ImVec2 lcdMin(clockMin.x + 4.0f * scale, clockMin.y + 4.0f * scale);
+    const ImVec2 lcdMax(clockMax.x - 4.0f * scale, clockMax.y - 4.0f * scale);
     RetroGfx::drawSunkenBorder(dl, lcdMin, lcdMax, IM_COL32(10, 24, 18, 255));
 
     // Green LCD Clock Text
     const ImVec2 cSize = ImGui::CalcTextSize(clockText);
-    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - cSize.x) * 0.5f, lcdMin.y + 8.0f),
+    const float timeY = lcdMin.y + (lcdMax.y - lcdMin.y) * 0.28f - cSize.y * 0.5f;
+    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - cSize.x) * 0.5f, timeY),
                 IM_COL32(0, 255, 120, 255), clockText);
 
     const ImVec2 dSize = ImGui::CalcTextSize(dateStr);
-    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - dSize.x) * 0.5f, lcdMin.y + 32.0f),
+    const float dateY = lcdMin.y + (lcdMax.y - lcdMin.y) * 0.72f - dSize.y * 0.5f;
+    dl->AddText(ImVec2(lcdMin.x + (lcdMax.x - lcdMin.x - dSize.x) * 0.5f, dateY),
                 IM_COL32(140, 210, 180, 255), dateStr);
 }
 
 // Single desktop shortcut icon button
 void drawDesktopShortcut(const char* label, const char* appId, Compositor& compositor,
-                         float boxW, float iconGraphicSize,
+                         float boxW, float iconGraphicSize, float scale,
                          void (*iconDrawer)(ImDrawList*, const ImVec2&, float)) {
     const ImVec2 cur = ImGui::GetCursorScreenPos();
-    const ImVec2 boxSize(boxW, boxW + 20.0f);
+    const ImVec2 textSize = ImGui::CalcTextSize(label);
+    const float boxH = boxW + textSize.y + 8.0f * scale;
+    const ImVec2 boxSize(boxW, boxH);
     const ImVec2 pMax(cur.x + boxSize.x, cur.y + boxSize.y);
 
     ImGui::InvisibleButton(label, boxSize);
@@ -99,12 +130,11 @@ void drawDesktopShortcut(const char* label, const char* appId, Compositor& compo
     }
 
     // Icon graphic in top half
-    const ImVec2 iconCenter(cur.x + boxW * 0.5f, cur.y + boxW * 0.5f - 2.0f);
+    const ImVec2 iconCenter(cur.x + boxW * 0.5f, cur.y + boxW * 0.5f - 2.0f * scale);
     iconDrawer(dl, iconCenter, iconGraphicSize);
 
     // Label text centered underneath icon
-    const ImVec2 textSize = ImGui::CalcTextSize(label);
-    const ImVec2 textPos(cur.x + (boxW - textSize.x) * 0.5f, cur.y + boxW + 2.0f);
+    const ImVec2 textPos(cur.x + (boxW - textSize.x) * 0.5f, cur.y + boxW + 3.0f * scale);
 
     dl->AddText(ImVec2(textPos.x + 1.0f, textPos.y + 1.0f), IM_COL32(0, 0, 0, 220), label);
     dl->AddText(textPos, RetroGfx::kWhite, label);
@@ -123,44 +153,47 @@ void Desktop::draw(Compositor& compositor, const ImVec2& areaMin, const ImVec2& 
 
     // ── 1. Wallpaper Layer (Lowest layer) ──
     ImDrawList* bg = ImGui::GetBackgroundDrawList();
-    drawWallpaper(bg, view, compositor.config().wallpaperMode);
+    const WallpaperTexture& wpTex = compositor.wallpaperTexture();
+    drawWallpaper(bg, view, compositor.config().wallpaperMode,
+                  wpTex.handle(), wpTex.width(), wpTex.height());
 
     // ── 2. Desktop Digital Clock (Drawn to background draw list — zero input blocking) ──
-    drawDesktopClock(bg, areaMin, areaMax);
+    drawDesktopClock(bg, compositor, areaMin, areaMax);
 
     // ── 3. Desktop Shortcut Icons (Constrained to left sidebar — never covers full screen) ──
     if (compositor.config().showDesktopIcons) {
-        const float uiScale = compositor.config().uiScale;
+        const float uiScale = compositor.effectiveScale();
         const float boxW = 86.0f * uiScale;
         const float iconGraphicSize = 44.0f * uiScale;
-        const float shortcutsW = boxW + 20.0f;
-        const float shortcutsH = (boxW + 36.0f) * 3.5f;
+        const float shortcutsW = boxW + 24.0f * uiScale;
+        const float shortcutsH = (boxW + 36.0f * uiScale) * 4.5f;
 
         const ImGuiWindowFlags scFlags =
             ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
 
-        ImGui::SetNextWindowPos(ImVec2(areaMin.x + 16.0f, areaMin.y + 16.0f));
+        ImGui::SetNextWindowPos(ImVec2(areaMin.x + 16.0f * uiScale, areaMin.y + 16.0f * uiScale));
         ImGui::SetNextWindowSize(ImVec2(shortcutsW, shortcutsH));
         ImGui::SetNextWindowBgAlpha(0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f));
         ImGui::Begin("##DesktopShortcuts", nullptr, scFlags);
         ImGui::PopStyleVar();
 
-        drawDesktopShortcut("Files", "files", compositor, boxW, iconGraphicSize, RetroGfx::drawFolderIcon);
-        drawDesktopShortcut("Settings", "settings", compositor, boxW, iconGraphicSize, RetroGfx::drawSettingsIcon);
-        drawDesktopShortcut("Task Manager", "taskmanager", compositor, boxW, iconGraphicSize, RetroGfx::drawTaskManagerIcon);
+        drawDesktopShortcut("Files", "files", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawFolderIcon);
+        drawDesktopShortcut("Settings", "settings", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawSettingsIcon);
+        drawDesktopShortcut("Task Manager", "taskmanager", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawTaskManagerIcon);
+        drawDesktopShortcut("Calculator", "calculator", compositor, boxW, iconGraphicSize, uiScale, RetroGfx::drawCalculatorIcon);
 
         ImGui::End();
     }
 }
 
 void Desktop::drawPwr(Compositor& compositor, const ImVec2& /*areaMin*/, const ImVec2& areaMax) {
-    const float uiScale = compositor.config().uiScale;
+    const float uiScale = compositor.effectiveScale();
     const float pwrW = 142.0f * uiScale;
     const float pwrH = 44.0f * uiScale;
-    const float margin = 20.0f;
+    const float margin = 20.0f * uiScale;
 
     // Position PWR button at bottom-right of desktop area (just above taskbar)
     const ImVec2 pwrOrigin(areaMax.x - margin - pwrW, areaMax.y - margin - pwrH);
