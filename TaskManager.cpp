@@ -31,7 +31,7 @@ void TaskManagerApp::drawIcon(ImDrawList* dl, const ImVec2& center, float size) 
 }
 
 void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar;
     if (compositor.windowManager().isAppMaximized(m_id)) {
         flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
     }
@@ -51,7 +51,18 @@ void TaskManagerApp::render(Compositor& compositor, bool* keepOpen) {
 
         const float scale = compositor.effectiveScale();
 
-        // Classic Menu Bar / Tabs
+        // Classic Menu Bar (explicit Exit control)
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Exit")) {
+                    if (keepOpen) { *keepOpen = false; }
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenuBar();
+        }
+
+        // Classic Tabs
         if (ImGui::BeginTabBar("##TaskMgrTabs", ImGuiTabBarFlags_None)) {
             if (ImGui::BeginTabItem("Applications")) {
                 m_currentTab = 0;
