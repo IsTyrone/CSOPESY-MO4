@@ -234,7 +234,7 @@ void Desktop::drawPwr(Compositor& compositor, const ImVec2& /*areaMin*/, const I
     dl->AddText(textPos, RetroGfx::kBlack, "Shut Down");
 
     if (hovered) {
-        ImGui::SetTooltip("Shut down the CSOPESY OS Mockup (Requirement A: Clean exit path)");
+        ImGui::SetTooltip("Shut down the CSOPESY OS Mockup");
     }
 
     if (clicked) {
